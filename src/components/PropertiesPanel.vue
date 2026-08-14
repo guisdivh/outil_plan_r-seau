@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { EQUIPMENT_TYPES } from '../constants/equipmentTypes'
 import { INTERFACE_ROLES } from '../utils/interfaces'
+import { canExposePorts, parseWhitelist, formatWhitelist } from '../utils/exposedPorts'
 
 const store = usePlanStore()
 const nameDraft = ref('')
@@ -42,6 +43,14 @@ const rackName = computed(() => {
   if (!singleNode.value?.rackId) return null
   return store.racks.find((r) => r.id === singleNode.value.rackId)?.name ?? null
 })
+const siteName = computed(() => {
+  if (!singleNode.value?.siteId) return null
+  return store.sites.find((s) => s.id === singleNode.value.siteId)?.name ?? null
+})
+
+function onWhitelistChange(ruleId, event) {
+  store.updateExposedPort(singleNode.value.id, ruleId, { whitelist: parseWhitelist(event.target.value) })
+}
 </script>
 
 <template>
@@ -61,6 +70,7 @@ const rackName = computed(() => {
       </label>
       <p class="info-line">Zone : {{ zoneName ?? 'aucune' }}</p>
       <p class="info-line">Baie : {{ rackName ?? 'aucune' }}</p>
+      <p class="info-line">Site : {{ siteName ?? 'aucun' }}</p>
 
       <div class="interfaces">
         <div class="interfaces-header">
@@ -97,6 +107,76 @@ const rackName = computed(() => {
             <option value="">Sans VLAN</option>
             <option v-for="v in store.vlans" :key="v.id" :value="v.id">{{ v.number }} · {{ v.name }}</option>
           </select>
+        </div>
+      </div>
+
+      <div v-if="canExposePorts(singleNode)" class="interfaces">
+        <div class="interfaces-header">
+          <span>Ports exposés</span>
+          <button type="button" @click="store.addExposedPort(singleNode.id)">+ Règle</button>
+        </div>
+        <p v-if="!singleNode.exposedPorts.length" class="multi-hint">Aucune règle.</p>
+        <div v-for="rule in singleNode.exposedPorts" :key="rule.id" class="iface-row">
+          <div class="iface-row-top">
+            <input
+              type="text"
+              placeholder="Alias (ex: E-Logis)"
+              :value="rule.alias"
+              @change="store.updateExposedPort(singleNode.id, rule.id, { alias: $event.target.value })"
+            />
+            <button type="button" class="iface-delete" @click="store.removeExposedPort(singleNode.id, rule.id)">×</button>
+          </div>
+          <div class="iface-row-top">
+            <input
+              type="number"
+              placeholder="Port"
+              :value="rule.port"
+              @change="store.updateExposedPort(singleNode.id, rule.id, { port: Number($event.target.value) || null })"
+            />
+            <select
+              :value="rule.protocol"
+              @change="store.updateExposedPort(singleNode.id, rule.id, { protocol: $event.target.value })"
+            >
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP</option>
+            </select>
+          </div>
+          <div class="iface-row-top">
+            <input
+              type="text"
+              placeholder="IP destination"
+              :value="rule.destinationIp"
+              @change="store.updateExposedPort(singleNode.id, rule.id, { destinationIp: $event.target.value })"
+            />
+            <input
+              type="number"
+              placeholder="Port dest."
+              :value="rule.destinationPort"
+              @change="store.updateExposedPort(singleNode.id, rule.id, { destinationPort: Number($event.target.value) || null })"
+            />
+          </div>
+          <input
+            type="text"
+            placeholder="Whitelist IP (séparées par virgule)"
+            :value="formatWhitelist(rule)"
+            @change="onWhitelistChange(rule.id, $event)"
+          />
+          <div class="iface-row-top">
+            <select
+              :value="rule.direction"
+              @change="store.updateExposedPort(singleNode.id, rule.id, { direction: $event.target.value })"
+            >
+              <option value="inbound">Entrant</option>
+              <option value="outbound">Sortant</option>
+            </select>
+            <select
+              :value="rule.status"
+              @change="store.updateExposedPort(singleNode.id, rule.id, { status: $event.target.value })"
+            >
+              <option value="active">Actif</option>
+              <option value="inactive">Inactif</option>
+            </select>
+          </div>
         </div>
       </div>
     </template>

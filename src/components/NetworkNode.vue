@@ -5,6 +5,7 @@ import { NODE_SIZE, equipmentByType } from '../constants/equipmentTypes'
 import { RACK_WIDTH, RACK_UNIT_HEIGHT, pointInRack } from '../utils/rackLayout'
 import { formatInterface } from '../utils/interfaces'
 import { pointInSite } from '../utils/siteLayout'
+import { canExposePorts, summarizeRule } from '../utils/exposedPorts'
 import IconRouter from './icons/IconRouter.vue'
 import IconSwitch from './icons/IconSwitch.vue'
 import IconFirewall from './icons/IconFirewall.vue'
@@ -45,6 +46,11 @@ const ipLabels = computed(() =>
   store.showIpLabels || store.exportMode ? props.node.interfaces.map(formatInterface).filter(Boolean) : [],
 )
 const ipLabelStartY = computed(() => (isSelected.value ? 92 : 80))
+
+// Badge discret (ports exposés) : uniquement firewall/routeur, masqué à l'export
+// (remplacé par l'encart détaillé — voir FirewallRulesExport.vue).
+const exposedRules = computed(() => (canExposePorts(props.node) ? props.node.exposedPorts : []))
+const rulesTooltip = computed(() => exposedRules.value.map(summarizeRule).join('\n'))
 
 let dragAnchor = null
 let dragIds = []
@@ -112,7 +118,8 @@ function onPointerUp() {
   if (dragIds.length === 1) {
     const node = store.nodes.find((n) => n.id === dragIds[0])
     if (node) {
-      const rack = store.racks.find((r) => pointInRack(r, node.x, node.y))
+      // Une baie repliée n'affiche plus ses U : pas de dépôt possible dedans.
+      const rack = store.racks.find((r) => !r.collapsed && pointInRack(r, node.x, node.y))
       if (rack) {
         store.assignNodeToRack(node.id, rack.id)
       } else if (node.rackId) {
@@ -173,6 +180,11 @@ function toSvgPoint(svg, event) {
     >
       {{ line }}
     </text>
+    <g v-if="exposedRules.length && !store.exportMode" transform="translate(40,-6)" class="port-badge">
+      <rect width="20" height="14" rx="7" class="port-badge-bg" />
+      <text x="10" y="10" text-anchor="middle" class="port-badge-text">{{ exposedRules.length }}</text>
+      <title>{{ rulesTooltip }}</title>
+    </g>
   </g>
 
   <!-- Monté en baie : bande compacte pleine largeur, plutôt que l'icône libre. -->
@@ -227,6 +239,17 @@ function toSvgPoint(svg, event) {
   font-size: 9px;
   fill: var(--color-success);
   font-family: var(--font-mono);
+  user-select: none;
+}
+.port-badge-bg {
+  fill: var(--color-warning);
+  stroke: var(--color-surface);
+  stroke-width: 1.5;
+}
+.port-badge-text {
+  font-size: 9px;
+  font-weight: 700;
+  fill: #fff;
   user-select: none;
 }
 .rack-node-bg {

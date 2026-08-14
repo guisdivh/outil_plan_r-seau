@@ -8,6 +8,7 @@ import RackFrame from './RackFrame.vue'
 import SiteFrame from './SiteFrame.vue'
 import TunnelLink from './TunnelLink.vue'
 import ExportLegend from './ExportLegend.vue'
+import FirewallRulesExport from './FirewallRulesExport.vue'
 import { rackBounds } from '../utils/rackLayout'
 import { siteDisplaySize } from '../utils/siteLayout'
 
@@ -16,6 +17,9 @@ const cursor = ref({ x: 0, y: 0 })
 const marquee = ref(null)
 
 const linkSourceNode = computed(() => store.nodes.find((n) => n.id === store.linkingFromId) ?? null)
+const exportRuleNodes = computed(() =>
+  store.exportMode ? store.visibleNodes.filter((n) => n.exposedPorts.length) : [],
+)
 
 let marqueeStart = null
 let didDrag = false
@@ -145,6 +149,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       <NetworkLink v-for="link in store.links" :key="link.id" :link="link" />
       <TunnelLink v-for="tunnel in store.tunnels" :key="tunnel.id" :tunnel="tunnel" />
       <NetworkNode v-for="node in store.visibleNodes" :key="node.id" :node="node" />
+      <FirewallRulesExport v-for="node in exportRuleNodes" :key="node.id" :node="node" />
       <ExportLegend v-if="store.exportMode" />
 
       <line

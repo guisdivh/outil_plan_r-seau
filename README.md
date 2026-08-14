@@ -22,6 +22,9 @@ Voir [`prompts/`](./prompts) — chaque fichier est une étape à donner à l'as
 14. [Système de design + thème clair/sombre](./prompts/14-design-system-theme.md) — variables CSS, palette, deux thèmes.
 15. [Habillage des panneaux](./prompts/15-panels-styling.md) — toolbar, palette, propriétés, VLAN.
 16. [Rendu du canvas](./prompts/16-canvas-rendering.md) — fond, grille, nœuds, liens, thème.
-17. [Vue d'export PNG exhaustive](./prompts/17-export-view.md) — écran ≠ export, tout afficher au rendu final.
+17. [Vue d'export PNG exhaustive](./prompts/17-export-view.md) — écran ≠ export, tout afficher au rendu final. ✅
+18. [Ports exposés sur les firewalls](./prompts/18-firewall-exposed-ports.md) — règles NAT/whitelist, badge discret, tableau à l'export.
+19. [Rattachement complet à un site](./prompts/19-full-site-attachment.md) — équipements/zones/baies tous rattachables à un site.
+20. [Baies : U à la création, repli/extension](./prompts/20-rack-units-collapse.md) — U configurable dès l'ajout, baie repliable.
 
 Le code du projet Vue est scaffoldé à la racine de ce dossier (étape 1).

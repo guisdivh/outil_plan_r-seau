@@ -23,7 +23,10 @@ function addZone() {
 }
 
 function addRack() {
-  store.addRack()
+  const input = window.prompt("Nombre d'U de la nouvelle baie", '12')
+  if (input === null) return
+  const units = Number(input)
+  store.addRack(undefined, undefined, Number.isFinite(units) && units > 0 ? Math.round(units) : 12)
 }
 
 function addSite() {

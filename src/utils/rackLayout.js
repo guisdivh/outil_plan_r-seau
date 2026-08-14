@@ -1,13 +1,20 @@
 export const RACK_WIDTH = 220
 export const RACK_UNIT_HEIGHT = 22
 export const RACK_HEADER_HEIGHT = 28
+export const RACK_COLLAPSED_HEIGHT = RACK_HEADER_HEIGHT + 20
 
 export function rackHeight(rack) {
   return RACK_HEADER_HEIGHT + rack.units * RACK_UNIT_HEIGHT
 }
 
+// Hauteur réellement affichée (repliée ou non) : c'est celle à utiliser pour
+// tout calcul géométrique lié au rendu (sélection, dépôt d'équipement...).
+export function rackDisplayHeight(rack) {
+  return rack.collapsed ? RACK_COLLAPSED_HEIGHT : rackHeight(rack)
+}
+
 export function rackBounds(rack) {
-  return { x1: rack.x, y1: rack.y, x2: rack.x + RACK_WIDTH, y2: rack.y + rackHeight(rack) }
+  return { x1: rack.x, y1: rack.y, x2: rack.x + RACK_WIDTH, y2: rack.y + rackDisplayHeight(rack) }
 }
 
 export function pointInRack(rack, x, y) {

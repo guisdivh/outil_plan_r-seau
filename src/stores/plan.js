@@ -5,7 +5,8 @@ import { findZoneForNode } from '../utils/zoneAssignment'
 import { findFreeRackSlot, rackSlotCenter, RACK_WIDTH } from '../utils/rackLayout'
 import { closestSegmentIndex } from '../utils/waypoints'
 import { computeLinkRoutes } from '../utils/linkRouting'
-import { resolveEffectiveNodes, siteDisplaySize } from '../utils/siteLayout'
+import { siteDisplaySize } from '../utils/siteLayout'
+import { resolveEffectiveNodes } from '../utils/nodeVisibility'
 
 const STORAGE_KEY = 'outil-plan-reseau:plan'
 
@@ -58,17 +59,23 @@ export const usePlanStore = defineStore('plan', {
     selectedNodes: (state) => state.nodes.filter((n) => state.selectedIds.includes(n.id)),
     selectedNodeIds: (state) =>
       state.nodes.filter((n) => state.selectedIds.includes(n.id)).map((n) => n.id),
-    // Nœuds visibles sur le canvas : masque ceux dont le site est replié.
+    // Nœuds visibles sur le canvas : masque ceux dont le site ou la baie est replié.
     visibleNodes: (state) => {
       const collapsedSiteIds = new Set(state.sites.filter((s) => s.collapsed).map((s) => s.id))
-      return state.nodes.filter((n) => !n.siteId || !collapsedSiteIds.has(n.siteId))
+      const collapsedRackIds = new Set(state.racks.filter((r) => r.collapsed).map((r) => r.id))
+      return state.nodes.filter(
+        (n) =>
+          (!n.siteId || !collapsedSiteIds.has(n.siteId)) &&
+          (!n.rackId || !collapsedRackIds.has(n.rackId)),
+      )
     },
-    // Points à tracer pour chaque câble (voir utils/linkRouting.js) : un nœud dont
-    // le site est replié est ancré au centre du bloc site à la place de sa position réelle.
-    linkRoutes: (state) => computeLinkRoutes(state.links, resolveEffectiveNodes(state.nodes, state.sites)),
+    // Points à tracer pour chaque câble (voir utils/linkRouting.js) : un nœud dont le
+    // site/la baie est replié est ancré au centre du bloc replié plutôt qu'à sa position réelle.
+    linkRoutes: (state) =>
+      computeLinkRoutes(state.links, resolveEffectiveNodes(state.nodes, state.sites, state.racks)),
     // Extrémités (déjà résolues) de chaque tunnel : trait direct, pas de routage orthogonal.
     tunnelEndpoints: (state) => {
-      const resolved = resolveEffectiveNodes(state.nodes, state.sites)
+      const resolved = resolveEffectiveNodes(state.nodes, state.sites, state.racks)
       const byId = new Map(resolved.map((n) => [n.id, n]))
       const map = new Map()
       for (const t of state.tunnels) {
@@ -95,11 +102,42 @@ export const usePlanStore = defineStore('plan', {
         rackSpan: rackSpanByType(type),
         interfaces: [],
         siteId: null,
+        exposedPorts: [],
       }
       this.nodes.push(node)
       this.selectedIds = [node.id]
       this.recomputeZoneAssignments()
       return node
+    },
+
+    addExposedPort(nodeId) {
+      const node = this.nodes.find((n) => n.id === nodeId)
+      if (!node) return
+      const rule = {
+        id: nextId('rule'),
+        alias: '',
+        port: null,
+        protocol: 'tcp',
+        destinationIp: '',
+        destinationPort: null,
+        whitelist: [],
+        direction: 'inbound',
+        status: 'active',
+      }
+      node.exposedPorts.push(rule)
+      return rule
+    },
+
+    updateExposedPort(nodeId, ruleId, patch) {
+      const node = this.nodes.find((n) => n.id === nodeId)
+      const rule = node?.exposedPorts.find((r) => r.id === ruleId)
+      if (rule) Object.assign(rule, patch)
+    },
+
+    removeExposedPort(nodeId, ruleId) {
+      const node = this.nodes.find((n) => n.id === nodeId)
+      if (!node) return
+      node.exposedPorts = node.exposedPorts.filter((r) => r.id !== ruleId)
     },
 
     addInterface(nodeId) {
@@ -301,11 +339,22 @@ export const usePlanStore = defineStore('plan', {
         height,
         // Sous-réseau/VLAN logique optionnel, non exploité pour l'instant.
         subnet: '',
+        siteId: null,
       }
       this.zones.push(zone)
       this.selectedIds = [zone.id]
       this.recomputeZoneAssignments()
       return zone
+    },
+
+    assignZoneToSite(zoneId, siteId) {
+      const zone = this.zones.find((z) => z.id === zoneId)
+      if (zone) zone.siteId = siteId
+    },
+
+    removeZoneFromSite(zoneId) {
+      const zone = this.zones.find((z) => z.id === zoneId)
+      if (zone) zone.siteId = null
     },
 
     moveZone(id, x, y) {
@@ -351,10 +400,28 @@ export const usePlanStore = defineStore('plan', {
         x = rightEdges.length ? Math.max(...rightEdges) + 60 : 80
         y = topEdges.length ? Math.min(...topEdges) : 80
       }
-      const rack = { id: nextId('rack'), name: `Baie ${this.racks.length + 1}`, x, y, units }
+      const rack = {
+        id: nextId('rack'),
+        name: `Baie ${this.racks.length + 1}`,
+        x,
+        y,
+        units,
+        siteId: null,
+        collapsed: false,
+      }
       this.racks.push(rack)
       this.selectedIds = [rack.id]
       return rack
+    },
+
+    assignRackToSite(rackId, siteId) {
+      const rack = this.racks.find((r) => r.id === rackId)
+      if (rack) rack.siteId = siteId
+    },
+
+    removeRackFromSite(rackId) {
+      const rack = this.racks.find((r) => r.id === rackId)
+      if (rack) rack.siteId = null
     },
 
     moveRack(id, x, y) {
@@ -383,6 +450,11 @@ export const usePlanStore = defineStore('plan', {
       if (safeUnits < highestOccupied) return false
       rack.units = safeUnits
       return true
+    },
+
+    toggleRackCollapsed(id) {
+      const rack = this.racks.find((r) => r.id === id)
+      if (rack) rack.collapsed = !rack.collapsed
     },
 
     // Monte un équipement (libre ou déjà en baie) sur la première U libre de la
@@ -453,8 +525,9 @@ export const usePlanStore = defineStore('plan', {
       return site
     },
 
-    // Déplace le site et translate tous ses équipements membres du même delta
-    // (positionnement libre à l'intérieur, contrairement aux U figées d'une baie).
+    // Déplace le site et translate tout ce qu'il contient du même delta :
+    // équipements libres, zones, et baies (qui re-synchronisent au passage
+    // leurs propres équipements montés, sans quoi ils seraient déplacés deux fois).
     moveSite(id, x, y) {
       const site = this.sites.find((s) => s.id === id)
       if (!site) return
@@ -463,9 +536,22 @@ export const usePlanStore = defineStore('plan', {
       site.x = x
       site.y = y
       for (const node of this.nodes) {
-        if (node.siteId === id) {
+        if (node.siteId === id && !node.rackId) {
           node.x += dx
           node.y += dy
+        }
+      }
+      for (const zone of this.zones) {
+        if (zone.siteId === id) {
+          zone.x += dx
+          zone.y += dy
+        }
+      }
+      for (const rack of this.racks) {
+        if (rack.siteId === id) {
+          rack.x += dx
+          rack.y += dy
+          this.syncRackNodePositions(rack.id)
         }
       }
       this.recomputeZoneAssignments()
@@ -544,7 +630,7 @@ export const usePlanStore = defineStore('plan', {
       this.tunnels = this.tunnels.filter(
         (t) => !ids.has(t.id) && !ids.has(t.sourceId) && !ids.has(t.targetId),
       )
-      // Une baie/un site supprimé libère les équipements qu'il contenait (ils gardent leur position).
+      // Une baie/un site supprimé libère ce qu'il contenait (position conservée).
       for (const node of this.nodes) {
         if (node.rackId && !this.racks.some((r) => r.id === node.rackId)) {
           node.rackId = null
@@ -552,6 +638,16 @@ export const usePlanStore = defineStore('plan', {
         }
         if (node.siteId && !this.sites.some((s) => s.id === node.siteId)) {
           node.siteId = null
+        }
+      }
+      for (const zone of this.zones) {
+        if (zone.siteId && !this.sites.some((s) => s.id === zone.siteId)) {
+          zone.siteId = null
+        }
+      }
+      for (const rack of this.racks) {
+        if (rack.siteId && !this.sites.some((s) => s.id === rack.siteId)) {
+          rack.siteId = null
         }
       }
       this.selectedIds = []
@@ -581,6 +677,7 @@ export const usePlanStore = defineStore('plan', {
           rackSpan: rackSpanByType(item.type),
           interfaces: [],
           siteId: null,
+          exposedPorts: [],
         }
         this.nodes.push(node)
         idMap.set(item.id, node)
@@ -645,7 +742,9 @@ export const usePlanStore = defineStore('plan', {
     },
 
     loadFromData(data) {
-      this.racks = Array.isArray(data.racks) ? data.racks : []
+      this.racks = Array.isArray(data.racks)
+        ? data.racks.map((r) => ({ siteId: null, collapsed: false, ...r }))
+        : []
       this.vlans = Array.isArray(data.vlans) ? data.vlans : []
       this.sites = Array.isArray(data.sites) ? data.sites.map((s) => ({ collapsed: false, ...s })) : []
       this.tunnels = Array.isArray(data.tunnels) ? data.tunnels.map((t) => ({ phase: '', ...t })) : []
@@ -656,15 +755,26 @@ export const usePlanStore = defineStore('plan', {
             rackSpan: rackSpanByType(n.type),
             interfaces: [],
             siteId: null,
+            exposedPorts: [],
             ...n,
           }))
         : []
       this.links = Array.isArray(data.links)
         ? data.links.map((l) => ({ vlanId: null, waypoints: [], ...l }))
         : []
-      this.zones = Array.isArray(data.zones) ? data.zones.map((z) => ({ subnet: '', ...z })) : []
+      this.zones = Array.isArray(data.zones)
+        ? data.zones.map((z) => ({ subnet: '', siteId: null, ...z }))
+        : []
       this.selectedIds = []
       this.linkingFromId = null
+
+      // Anti-orphelin : un siteId qui ne pointe vers aucun site chargé est nettoyé,
+      // plutôt que de laisser un rattachement invisible et incohérent.
+      const siteIds = new Set(this.sites.map((s) => s.id))
+      for (const node of this.nodes) if (node.siteId && !siteIds.has(node.siteId)) node.siteId = null
+      for (const zone of this.zones) if (zone.siteId && !siteIds.has(zone.siteId)) zone.siteId = null
+      for (const rack of this.racks) if (rack.siteId && !siteIds.has(rack.siteId)) rack.siteId = null
+
       bumpIdCounterFrom([
         this.nodes,
         this.links,
@@ -674,6 +784,7 @@ export const usePlanStore = defineStore('plan', {
         this.sites,
         this.tunnels,
         this.nodes.flatMap((n) => n.interfaces),
+        this.nodes.flatMap((n) => n.exposedPorts),
       ])
     },
 

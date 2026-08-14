@@ -30,7 +30,7 @@ function addNode(type) {
       « Mode relier » (barre d'outils) : clic sur 2 nœuds pour les relier.<br />
       Raccourci : Alt+clic fait pareil sans activer le mode.<br />
       Glisser un équipement sur une baie : le monte sur la première U libre.<br />
-      Double-clic sur une baie : renommer ; sur son « X U » : changer la taille.<br />
+      Double-clic sur une baie : renommer ; sur son « X U » : changer la taille ; « ▾ » : replier.<br />
       Clic sur un câble : sélectionner (double-clic sur l'étiquette : renommer).<br />
       Double-clic sur un câble : ajouter un point de passage ; glisser/double-clic dessus : déplacer/retirer.<br />
       Glisser un équipement sur un site : le rattache (position libre).<br />

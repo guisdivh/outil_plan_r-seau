@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { usePlanStore } from '../stores/plan'
+import { pointInSite } from '../utils/siteLayout'
 
 const props = defineProps({
   zone: { type: Object, required: true },
@@ -11,6 +12,7 @@ const isSelected = computed(() => store.selectedIds.includes(props.zone.id))
 const isAssignedToSelected = computed(() =>
   store.selectedNodes.some((n) => n.zoneId === props.zone.id),
 )
+const siteName = computed(() => store.sites.find((s) => s.id === props.zone.siteId)?.name ?? null)
 
 const PALETTE = ['#38bdf8', '#a78bfa', '#4ade80', '#fb923c', '#f472b6', '#94a3b8']
 
@@ -47,6 +49,16 @@ function onBodyPointerUp() {
   dragOffset = null
   window.removeEventListener('pointermove', onBodyPointerMove)
   window.removeEventListener('pointerup', onBodyPointerUp)
+
+  // Lâchée dans un site : s'y rattache ; lâchée en dehors : s'en détache.
+  const centerX = props.zone.x + props.zone.width / 2
+  const centerY = props.zone.y + props.zone.height / 2
+  const site = store.sites.find((s) => pointInSite(s, centerX, centerY))
+  if (site) {
+    store.assignZoneToSite(props.zone.id, site.id)
+  } else if (props.zone.siteId) {
+    store.removeZoneFromSite(props.zone.id)
+  }
 }
 
 let resizeStart = null
@@ -108,6 +120,9 @@ function rename() {
     <text :x="zone.x + 10" :y="zone.y + 18" class="zone-label" :fill="zone.color" @dblclick="rename">
       {{ zone.name }}
     </text>
+    <text v-if="isSelected" :x="zone.x + 10" :y="zone.y + 32" class="zone-site-label">
+      {{ siteName ? `site : ${siteName}` : 'aucun site' }}
+    </text>
 
     <g v-if="isSelected" class="zone-palette">
       <circle
@@ -139,6 +154,12 @@ function rename() {
 .zone-label {
   font-size: 12px;
   font-weight: 600;
+  user-select: none;
+}
+.zone-site-label {
+  font-size: 10px;
+  font-style: italic;
+  fill: var(--color-site-border);
   user-select: none;
 }
 .zone-assigned-highlight {
