@@ -25,8 +25,15 @@ function addNode(type) {
 
     <p class="hint">
       Clic : sélectionner / déplacer.<br />
-      Alt+clic sur deux nœuds : les relier par un câble.<br />
-      Suppr : supprimer la sélection.
+      Ctrl/Cmd+clic : ajouter à la sélection.<br />
+      Drag dans le vide : sélection par rectangle.<br />
+      « Mode relier » (barre d'outils) : clic sur 2 nœuds pour les relier.<br />
+      Raccourci : Alt+clic fait pareil sans activer le mode.<br />
+      Glisser un équipement sur une baie : le monte sur la première U libre.<br />
+      Double-clic sur une baie : renommer ; sur son « X U » : changer la taille.<br />
+      Clic sur un câble : sélectionner (double-clic sur l'étiquette : renommer).<br />
+      Double-clic sur un câble : ajouter un point de passage ; glisser/double-clic dessus : déplacer/retirer.<br />
+      Suppr : supprimer la sélection (multiple incluse).
     </p>
   </aside>
 </template>

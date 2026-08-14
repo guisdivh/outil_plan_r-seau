@@ -4,13 +4,19 @@ import { usePlanStore } from '../stores/plan'
 import { downloadText } from '../utils/download'
 import { exportSvg, exportPng } from '../utils/export'
 import { parseImportItems } from '../utils/importData'
+import VlanPanel from './VlanPanel.vue'
 
 const store = usePlanStore()
 const fileInput = ref(null)
 const dataFileInput = ref(null)
+const showVlans = ref(false)
 
 function addZone() {
   store.addZone()
+}
+
+function addRack() {
+  store.addRack()
 }
 
 function exportJson() {
@@ -62,6 +68,20 @@ function onExportPng() {
     <strong class="title">Outil Plan Réseau</strong>
 
     <button type="button" @click="addZone">+ Zone</button>
+    <button type="button" @click="addRack">+ Baie</button>
+    <button type="button" class="mode-button" :class="{ active: showVlans }" @click="showVlans = !showVlans">
+      VLANs
+    </button>
+    <VlanPanel v-if="showVlans" @close="showVlans = false" />
+    <button
+      type="button"
+      class="mode-button"
+      :class="{ active: store.linkMode }"
+      title="Clic sur un nœud source puis un nœud cible pour créer un câble. Échap pour annuler/sortir."
+      @click="store.toggleLinkMode()"
+    >
+      {{ store.linkMode ? '✓ Mode relier' : 'Mode relier' }}
+    </button>
 
     <span class="sep" />
 
@@ -95,6 +115,7 @@ function onExportPng() {
 
 <style scoped>
 .toolbar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -122,5 +143,10 @@ button:hover {
 }
 .hidden-input {
   display: none;
+}
+.mode-button.active {
+  background: #f59e0b;
+  border-color: #d97706;
+  color: #fff;
 }
 </style>

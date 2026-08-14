@@ -7,7 +7,10 @@ const props = defineProps({
 })
 
 const store = usePlanStore()
-const isSelected = computed(() => store.selectedId === props.zone.id)
+const isSelected = computed(() => store.selectedIds.includes(props.zone.id))
+const isAssignedToSelected = computed(() =>
+  store.selectedNodes.some((n) => n.zoneId === props.zone.id),
+)
 
 const PALETTE = ['#38bdf8', '#a78bfa', '#4ade80', '#fb923c', '#f472b6', '#94a3b8']
 
@@ -19,7 +22,15 @@ function toSvgPoint(svg, event) {
 let dragOffset = null
 function onBodyPointerDown(event) {
   event.stopPropagation()
-  store.select(props.zone.id)
+
+  if (event.ctrlKey || event.metaKey) {
+    store.toggleSelected(props.zone.id)
+    return
+  }
+  if (!store.selectedIds.includes(props.zone.id)) {
+    store.select(props.zone.id)
+  }
+
   const svg = event.currentTarget.ownerSVGElement
   const point = toSvgPoint(svg, event)
   dragOffset = { dx: point.x - props.zone.x, dy: point.y - props.zone.y }
@@ -73,6 +84,15 @@ function rename() {
 <template>
   <g class="zone" :class="{ selected: isSelected }">
     <rect
+      v-if="isAssignedToSelected"
+      :x="zone.x - 4"
+      :y="zone.y - 4"
+      :width="zone.width + 8"
+      :height="zone.height + 8"
+      rx="10"
+      class="zone-assigned-highlight"
+    />
+    <rect
       :x="zone.x"
       :y="zone.y"
       :width="zone.width"
@@ -120,6 +140,13 @@ function rename() {
   font-size: 12px;
   font-weight: 600;
   user-select: none;
+}
+.zone-assigned-highlight {
+  fill: none;
+  stroke: #16a34a;
+  stroke-width: 3;
+  stroke-dasharray: 6 3;
+  pointer-events: none;
 }
 .resize-handle {
   fill: #1f2937;
