@@ -5,7 +5,10 @@ import NetworkNode from './NetworkNode.vue'
 import NetworkLink from './NetworkLink.vue'
 import ZoneRect from './ZoneRect.vue'
 import RackFrame from './RackFrame.vue'
+import SiteFrame from './SiteFrame.vue'
+import TunnelLink from './TunnelLink.vue'
 import { rackBounds } from '../utils/rackLayout'
+import { siteDisplaySize } from '../utils/siteLayout'
 
 const store = usePlanStore()
 const cursor = ref({ x: 0, y: 0 })
@@ -23,7 +26,8 @@ function onSvgPointerDown(event) {
     store.cancelLinking()
     return
   }
-  if (store.linkMode) return // mode relier en attente du premier nœud : rien à faire sur fond vide
+  // Mode relier/tunnel en attente du premier nœud : rien à faire sur fond vide.
+  if (store.linkMode || store.tunnelMode) return
 
   const rect = event.currentTarget.getBoundingClientRect()
   marqueeStart = { x: event.clientX - rect.left, y: event.clientY - rect.top }
@@ -76,8 +80,16 @@ function onMarqueeUp(event) {
         return b.x1 >= box.x && b.x2 <= x2 && b.y1 >= box.y && b.y2 <= y2
       })
       .map((r) => r.id)
+    const siteIds = store.sites
+      .filter((s) => {
+        const { width, height } = siteDisplaySize(s)
+        return s.x >= box.x && s.x + width <= x2 && s.y >= box.y && s.y + height <= y2
+      })
+      .map((s) => s.id)
 
-    store.selectIds([...nodeIds, ...zoneIds, ...rackIds], { additive: event.ctrlKey || event.metaKey })
+    store.selectIds([...nodeIds, ...zoneIds, ...rackIds, ...siteIds], {
+      additive: event.ctrlKey || event.metaKey,
+    })
   } else {
     store.clearSelection()
   }
@@ -103,8 +115,8 @@ function onKeydown(event) {
     if (store.linkingFromId) {
       // Annule seulement le câble en cours ; le mode relier reste actif.
       store.cancelLinking()
-    } else if (store.linkMode) {
-      store.exitLinkMode()
+    } else if (store.linkMode || store.tunnelMode) {
+      store.exitLinkingModes()
     } else {
       store.clearSelection()
     }
@@ -120,10 +132,12 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
     <svg width="100%" height="100%" @pointerdown="onSvgPointerDown" @pointermove="onPointerMove">
       <rect width="100%" height="100%" fill="#fafafa" />
 
+      <SiteFrame v-for="site in store.sites" :key="site.id" :site="site" />
       <ZoneRect v-for="zone in store.zones" :key="zone.id" :zone="zone" />
       <RackFrame v-for="rack in store.racks" :key="rack.id" :rack="rack" />
       <NetworkLink v-for="link in store.links" :key="link.id" :link="link" />
-      <NetworkNode v-for="node in store.nodes" :key="node.id" :node="node" />
+      <TunnelLink v-for="tunnel in store.tunnels" :key="tunnel.id" :tunnel="tunnel" />
+      <NetworkNode v-for="node in store.visibleNodes" :key="node.id" :node="node" />
 
       <line
         v-if="linkSourceNode"
@@ -132,6 +146,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         :x2="cursor.x"
         :y2="cursor.y"
         class="ghost-link"
+        :class="{ tunnel: store.tunnelMode }"
       />
 
       <rect
@@ -159,6 +174,10 @@ svg {
   stroke-width: 2;
   stroke-dasharray: 5 4;
   pointer-events: none;
+}
+.ghost-link.tunnel {
+  stroke: #7c3aed;
+  stroke-dasharray: 6 4;
 }
 .marquee-rect {
   fill: rgba(37, 99, 235, 0.1);

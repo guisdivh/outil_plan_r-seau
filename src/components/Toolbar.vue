@@ -19,6 +19,10 @@ function addRack() {
   store.addRack()
 }
 
+function addSite() {
+  store.addSite()
+}
+
 function exportJson() {
   downloadText(store.toJSON(), 'plan-reseau.json', 'application/json')
 }
@@ -69,6 +73,7 @@ function onExportPng() {
 
     <button type="button" @click="addZone">+ Zone</button>
     <button type="button" @click="addRack">+ Baie</button>
+    <button type="button" @click="addSite">+ Site</button>
     <button type="button" class="mode-button" :class="{ active: showVlans }" @click="showVlans = !showVlans">
       VLANs
     </button>
@@ -81,6 +86,24 @@ function onExportPng() {
       @click="store.toggleLinkMode()"
     >
       {{ store.linkMode ? '✓ Mode relier' : 'Mode relier' }}
+    </button>
+    <button
+      type="button"
+      class="mode-button tunnel"
+      :class="{ active: store.tunnelMode }"
+      title="Clic sur une passerelle source puis une passerelle cible pour créer un tunnel IPsec. Échap pour annuler/sortir."
+      @click="store.toggleTunnelMode()"
+    >
+      {{ store.tunnelMode ? '✓ Tunnel IPsec' : 'Tunnel IPsec' }}
+    </button>
+    <button
+      type="button"
+      class="mode-button"
+      :class="{ active: store.showIpLabels }"
+      title="Afficher/masquer les adresses IP des interfaces sur le canvas."
+      @click="store.toggleIpLabels()"
+    >
+      Afficher IP
     </button>
 
     <span class="sep" />
@@ -148,5 +171,9 @@ button:hover {
   background: #f59e0b;
   border-color: #d97706;
   color: #fff;
+}
+.mode-button.tunnel.active {
+  background: #7c3aed;
+  border-color: #6d28d9;
 }
 </style>

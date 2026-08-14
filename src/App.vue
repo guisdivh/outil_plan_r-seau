@@ -3,6 +3,7 @@ import { onMounted, onUnmounted } from 'vue'
 import NodePalette from './components/NodePalette.vue'
 import CanvasBoard from './components/CanvasBoard.vue'
 import Toolbar from './components/Toolbar.vue'
+import PropertiesPanel from './components/PropertiesPanel.vue'
 import { usePlanStore } from './stores/plan'
 
 const store = usePlanStore()
@@ -29,6 +30,7 @@ onUnmounted(() => {
     <div class="body">
       <NodePalette />
       <CanvasBoard />
+      <PropertiesPanel />
     </div>
   </div>
 </template>

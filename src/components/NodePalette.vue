@@ -33,6 +33,9 @@ function addNode(type) {
       Double-clic sur une baie : renommer ; sur son « X U » : changer la taille.<br />
       Clic sur un câble : sélectionner (double-clic sur l'étiquette : renommer).<br />
       Double-clic sur un câble : ajouter un point de passage ; glisser/double-clic dessus : déplacer/retirer.<br />
+      Glisser un équipement sur un site : le rattache (position libre).<br />
+      « Tunnel IPsec » (barre d'outils) : clic sur 2 passerelles pour créer un tunnel.<br />
+      Double-clic sur un site : renommer ; « replier » : masque son contenu.<br />
       Suppr : supprimer la sélection (multiple incluse).
     </p>
   </aside>

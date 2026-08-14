@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { NODE_SIZE, equipmentByType } from '../constants/equipmentTypes'
 import { RACK_WIDTH, RACK_UNIT_HEIGHT, pointInRack } from '../utils/rackLayout'
+import { formatInterface } from '../utils/interfaces'
+import { pointInSite } from '../utils/siteLayout'
 import IconRouter from './icons/IconRouter.vue'
 import IconSwitch from './icons/IconSwitch.vue'
 import IconFirewall from './icons/IconFirewall.vue'
@@ -38,6 +40,12 @@ const zoneName = computed(() => store.zones.find((z) => z.id === props.node.zone
 const isRacked = computed(() => !!props.node.rackId)
 const rackNodeHeight = computed(() => props.node.rackSpan * RACK_UNIT_HEIGHT - 2)
 
+// Étiquettes IP sur le canvas : activables globalement, masquées en baie (pas la place).
+const ipLabels = computed(() =>
+  store.showIpLabels ? props.node.interfaces.map(formatInterface).filter(Boolean) : [],
+)
+const ipLabelStartY = computed(() => (isSelected.value ? 92 : 80))
+
 let dragAnchor = null
 let dragIds = []
 
@@ -51,13 +59,15 @@ function onPointerDown(event) {
     return
   }
 
-  // Mode « relier » actif, ou Alt/clic droit en raccourci : tire un câble plutôt qu'un déplacement.
-  if (store.linkMode || event.altKey || event.button === 2) {
+  // Mode « relier » ou « tunnel IPsec » actif, ou Alt/clic droit en raccourci
+  // (toujours un câble) : tire un lien plutôt qu'un déplacement.
+  if (store.linkMode || store.tunnelMode || event.altKey || event.button === 2) {
     store.select(props.node.id)
     if (store.linkingFromId) {
       store.finishLinking(props.node.id)
     } else {
-      store.startLinking(props.node.id)
+      const kind = event.altKey || event.button === 2 ? 'cable' : store.tunnelMode ? 'tunnel' : 'cable'
+      store.startLinking(props.node.id, kind)
     }
     return
   }
@@ -108,6 +118,13 @@ function onPointerUp() {
       } else if (node.rackId) {
         store.removeNodeFromRack(node.id, node.x, node.y)
       }
+
+      const site = store.sites.find((s) => pointInSite(s, node.x, node.y))
+      if (site) {
+        store.assignNodeToSite(node.id, site.id)
+      } else if (node.siteId) {
+        store.removeNodeFromSite(node.id)
+      }
     }
   }
 
@@ -144,6 +161,16 @@ function toSvgPoint(svg, event) {
     <text :x="NODE_SIZE / 2" y="68" text-anchor="middle" class="node-label">{{ node.label }}</text>
     <text v-if="isSelected" :x="NODE_SIZE / 2" y="80" text-anchor="middle" class="node-zone-label">
       {{ zoneName ? `zone : ${zoneName}` : 'aucune zone' }}
+    </text>
+    <text
+      v-for="(line, i) in ipLabels"
+      :key="i"
+      :x="NODE_SIZE / 2"
+      :y="ipLabelStartY + i * 11"
+      text-anchor="middle"
+      class="node-ip-label"
+    >
+      {{ line }}
     </text>
   </g>
 
@@ -187,6 +214,12 @@ function toSvgPoint(svg, event) {
   font-size: 10px;
   font-style: italic;
   fill: #2563eb;
+  user-select: none;
+}
+.node-ip-label {
+  font-size: 9px;
+  fill: #059669;
+  font-family: monospace;
   user-select: none;
 }
 .rack-node-bg {

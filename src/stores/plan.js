@@ -5,6 +5,7 @@ import { findZoneForNode } from '../utils/zoneAssignment'
 import { findFreeRackSlot, rackSlotCenter, RACK_WIDTH } from '../utils/rackLayout'
 import { closestSegmentIndex } from '../utils/waypoints'
 import { computeLinkRoutes } from '../utils/linkRouting'
+import { resolveEffectiveNodes, siteDisplaySize } from '../utils/siteLayout'
 
 const STORAGE_KEY = 'outil-plan-reseau:plan'
 
@@ -34,20 +35,46 @@ export const usePlanStore = defineStore('plan', {
     zones: [],
     racks: [],
     vlans: [],
+    sites: [],
+    tunnels: [],
     selectedIds: [],
-    // id du nœud depuis lequel on est en train de tirer un câble, ou null
+    // id du nœud depuis lequel on est en train de tirer un câble/tunnel, ou null
     linkingFromId: null,
+    // 'cable' ou 'tunnel' : décidé au premier clic (startLinking), utilisé par finishLinking
+    linkingKind: 'cable',
     // mode « relier » actif : un clic gauche sur un nœud tire un câble
     // au lieu de le déplacer (Alt+clic reste un raccourci direct hors mode)
     linkMode: false,
+    // mode « tunnel IPsec » : même principe que linkMode, mutuellement exclusif
+    tunnelMode: false,
+    // Réglage d'affichage (pas une donnée du plan, non exporté/sauvegardé).
+    showIpLabels: false,
   }),
 
   getters: {
     selectedNodes: (state) => state.nodes.filter((n) => state.selectedIds.includes(n.id)),
     selectedNodeIds: (state) =>
       state.nodes.filter((n) => state.selectedIds.includes(n.id)).map((n) => n.id),
-    // Points à tracer pour chaque câble : voir utils/linkRouting.js.
-    linkRoutes: (state) => computeLinkRoutes(state.links, state.nodes),
+    // Nœuds visibles sur le canvas : masque ceux dont le site est replié.
+    visibleNodes: (state) => {
+      const collapsedSiteIds = new Set(state.sites.filter((s) => s.collapsed).map((s) => s.id))
+      return state.nodes.filter((n) => !n.siteId || !collapsedSiteIds.has(n.siteId))
+    },
+    // Points à tracer pour chaque câble (voir utils/linkRouting.js) : un nœud dont
+    // le site est replié est ancré au centre du bloc site à la place de sa position réelle.
+    linkRoutes: (state) => computeLinkRoutes(state.links, resolveEffectiveNodes(state.nodes, state.sites)),
+    // Extrémités (déjà résolues) de chaque tunnel : trait direct, pas de routage orthogonal.
+    tunnelEndpoints: (state) => {
+      const resolved = resolveEffectiveNodes(state.nodes, state.sites)
+      const byId = new Map(resolved.map((n) => [n.id, n]))
+      const map = new Map()
+      for (const t of state.tunnels) {
+        const source = byId.get(t.sourceId)
+        const target = byId.get(t.targetId)
+        if (source && target) map.set(t.id, { source, target })
+      }
+      return map
+    },
   },
 
   actions: {
@@ -63,11 +90,55 @@ export const usePlanStore = defineStore('plan', {
         rackId: null,
         rackUnit: null,
         rackSpan: rackSpanByType(type),
+        interfaces: [],
+        siteId: null,
       }
       this.nodes.push(node)
       this.selectedIds = [node.id]
       this.recomputeZoneAssignments()
       return node
+    },
+
+    addInterface(nodeId) {
+      const node = this.nodes.find((n) => n.id === nodeId)
+      if (!node) return
+      const iface = { id: nextId('iface'), role: 'lan', ip: '', mask: '', vlanId: null }
+      node.interfaces.push(iface)
+      return iface
+    },
+
+    updateInterface(nodeId, interfaceId, patch) {
+      const node = this.nodes.find((n) => n.id === nodeId)
+      const iface = node?.interfaces.find((i) => i.id === interfaceId)
+      if (iface) Object.assign(iface, patch)
+    },
+
+    removeInterface(nodeId, interfaceId) {
+      const node = this.nodes.find((n) => n.id === nodeId)
+      if (!node) return
+      node.interfaces = node.interfaces.filter((i) => i.id !== interfaceId)
+    },
+
+    toggleIpLabels() {
+      this.showIpLabels = !this.showIpLabels
+    },
+
+    renameNode(id, label) {
+      const node = this.nodes.find((n) => n.id === id)
+      if (node) node.label = label
+    },
+
+    // Le rackSpan par défaut n'est recalculé que si le nœud n'est pas en baie,
+    // pour ne pas perturber un emplacement déjà occupé.
+    setNodeType(id, type) {
+      const node = this.nodes.find((n) => n.id === id)
+      if (!node) return
+      node.type = type
+      if (!node.rackId) node.rackSpan = rackSpanByType(type)
+    },
+
+    setNodesType(ids, type) {
+      for (const id of ids) this.setNodeType(id, type)
     },
 
     // Déplace tous les nœuds de `ids` par le même delta (déplacement groupé).
@@ -105,8 +176,9 @@ export const usePlanStore = defineStore('plan', {
       this.selectedIds = []
     },
 
-    startLinking(id) {
+    startLinking(id, kind = 'cable') {
       this.linkingFromId = id
+      this.linkingKind = kind
     },
 
     cancelLinking() {
@@ -115,19 +187,41 @@ export const usePlanStore = defineStore('plan', {
 
     toggleLinkMode() {
       this.linkMode = !this.linkMode
+      this.tunnelMode = false
       this.linkingFromId = null
     },
 
-    exitLinkMode() {
+    toggleTunnelMode() {
+      this.tunnelMode = !this.tunnelMode
       this.linkMode = false
       this.linkingFromId = null
     },
 
-    // Termine la création d'un câble vers le nœud ciblé, si valide.
+    exitLinkingModes() {
+      this.linkMode = false
+      this.tunnelMode = false
+      this.linkingFromId = null
+    },
+
+    // Termine la création d'un câble ou d'un tunnel vers le nœud ciblé, selon
+    // le type décidé au premier clic (startLinking).
     finishLinking(targetId) {
       const sourceId = this.linkingFromId
+      const kind = this.linkingKind
       this.linkingFromId = null
       if (!sourceId || sourceId === targetId) return
+
+      if (kind === 'tunnel') {
+        const alreadyTunneled = this.tunnels.some(
+          (t) =>
+            (t.sourceId === sourceId && t.targetId === targetId) ||
+            (t.sourceId === targetId && t.targetId === sourceId),
+        )
+        if (alreadyTunneled) return
+        this.tunnels.push({ id: nextId('tunnel'), name: '', sourceId, targetId, phase: '' })
+        return
+      }
+
       const alreadyLinked = this.links.some(
         (l) =>
           (l.sourceId === sourceId && l.targetId === targetId) ||
@@ -135,6 +229,16 @@ export const usePlanStore = defineStore('plan', {
       )
       if (alreadyLinked) return
       this.links.push({ id: nextId('link'), sourceId, targetId, label: '', vlanId: null, waypoints: [] })
+    },
+
+    renameTunnel(id, name) {
+      const tunnel = this.tunnels.find((t) => t.id === id)
+      if (tunnel && name !== null) tunnel.name = name
+    },
+
+    setTunnelPhase(id, phase) {
+      const tunnel = this.tunnels.find((t) => t.id === id)
+      if (tunnel && phase !== null) tunnel.phase = phase
     },
 
     renameLink(id, name) {
@@ -317,6 +421,76 @@ export const usePlanStore = defineStore('plan', {
       }
     },
 
+    // Sans position explicite, place le site à droite du contenu existant
+    // (même logique que addZone/addRack) pour ne jamais le superposer à l'existant.
+    addSite(x, y, width = 320, height = 220) {
+      if (x === undefined || y === undefined) {
+        const rightEdges = [
+          ...this.nodes.map((n) => n.x + 28),
+          ...this.zones.map((z) => z.x + z.width),
+          ...this.racks.map((r) => r.x + RACK_WIDTH),
+          ...this.sites.map((s) => s.x + siteDisplaySize(s).width),
+        ]
+        const topEdges = [
+          ...this.nodes.map((n) => n.y - 28),
+          ...this.zones.map((z) => z.y),
+          ...this.racks.map((r) => r.y),
+          ...this.sites.map((s) => s.y),
+        ]
+        x = rightEdges.length ? Math.max(...rightEdges) + 60 : 80
+        y = topEdges.length ? Math.min(...topEdges) : 80
+      }
+      const site = { id: nextId('site'), name: `Site ${this.sites.length + 1}`, x, y, width, height, collapsed: false }
+      this.sites.push(site)
+      this.selectedIds = [site.id]
+      return site
+    },
+
+    // Déplace le site et translate tous ses équipements membres du même delta
+    // (positionnement libre à l'intérieur, contrairement aux U figées d'une baie).
+    moveSite(id, x, y) {
+      const site = this.sites.find((s) => s.id === id)
+      if (!site) return
+      const dx = x - site.x
+      const dy = y - site.y
+      site.x = x
+      site.y = y
+      for (const node of this.nodes) {
+        if (node.siteId === id) {
+          node.x += dx
+          node.y += dy
+        }
+      }
+      this.recomputeZoneAssignments()
+    },
+
+    resizeSite(id, width, height) {
+      const site = this.sites.find((s) => s.id === id)
+      if (!site) return
+      site.width = Math.max(160, width)
+      site.height = Math.max(100, height)
+    },
+
+    renameSite(id, name) {
+      const site = this.sites.find((s) => s.id === id)
+      if (site && name) site.name = name
+    },
+
+    toggleSiteCollapsed(id) {
+      const site = this.sites.find((s) => s.id === id)
+      if (site) site.collapsed = !site.collapsed
+    },
+
+    assignNodeToSite(nodeId, siteId) {
+      const node = this.nodes.find((n) => n.id === nodeId)
+      if (node) node.siteId = siteId
+    },
+
+    removeNodeFromSite(nodeId) {
+      const node = this.nodes.find((n) => n.id === nodeId)
+      if (node) node.siteId = null
+    },
+
     addVlan() {
       const used = this.vlans.map((v) => v.number)
       let number = 10
@@ -359,11 +533,18 @@ export const usePlanStore = defineStore('plan', {
       this.links = this.links.filter((l) => !ids.has(l.id) && !ids.has(l.sourceId) && !ids.has(l.targetId))
       this.zones = this.zones.filter((z) => !ids.has(z.id))
       this.racks = this.racks.filter((r) => !ids.has(r.id))
-      // Une baie supprimée libère les équipements qu'elle contenait (ils gardent leur position).
+      this.sites = this.sites.filter((s) => !ids.has(s.id))
+      this.tunnels = this.tunnels.filter(
+        (t) => !ids.has(t.id) && !ids.has(t.sourceId) && !ids.has(t.targetId),
+      )
+      // Une baie/un site supprimé libère les équipements qu'il contenait (ils gardent leur position).
       for (const node of this.nodes) {
         if (node.rackId && !this.racks.some((r) => r.id === node.rackId)) {
           node.rackId = null
           node.rackUnit = null
+        }
+        if (node.siteId && !this.sites.some((s) => s.id === node.siteId)) {
+          node.siteId = null
         }
       }
       this.selectedIds = []
@@ -391,6 +572,8 @@ export const usePlanStore = defineStore('plan', {
           rackId: null,
           rackUnit: null,
           rackSpan: rackSpanByType(item.type),
+          interfaces: [],
+          siteId: null,
         }
         this.nodes.push(node)
         idMap.set(item.id, node)
@@ -440,7 +623,15 @@ export const usePlanStore = defineStore('plan', {
 
     toJSON() {
       return JSON.stringify(
-        { nodes: this.nodes, links: this.links, zones: this.zones, racks: this.racks, vlans: this.vlans },
+        {
+          nodes: this.nodes,
+          links: this.links,
+          zones: this.zones,
+          racks: this.racks,
+          vlans: this.vlans,
+          sites: this.sites,
+          tunnels: this.tunnels,
+        },
         null,
         2,
       )
@@ -449,8 +640,17 @@ export const usePlanStore = defineStore('plan', {
     loadFromData(data) {
       this.racks = Array.isArray(data.racks) ? data.racks : []
       this.vlans = Array.isArray(data.vlans) ? data.vlans : []
+      this.sites = Array.isArray(data.sites) ? data.sites.map((s) => ({ collapsed: false, ...s })) : []
+      this.tunnels = Array.isArray(data.tunnels) ? data.tunnels.map((t) => ({ phase: '', ...t })) : []
       this.nodes = Array.isArray(data.nodes)
-        ? data.nodes.map((n) => ({ rackId: null, rackUnit: null, rackSpan: rackSpanByType(n.type), ...n }))
+        ? data.nodes.map((n) => ({
+            rackId: null,
+            rackUnit: null,
+            rackSpan: rackSpanByType(n.type),
+            interfaces: [],
+            siteId: null,
+            ...n,
+          }))
         : []
       this.links = Array.isArray(data.links)
         ? data.links.map((l) => ({ vlanId: null, waypoints: [], ...l }))
@@ -458,7 +658,16 @@ export const usePlanStore = defineStore('plan', {
       this.zones = Array.isArray(data.zones) ? data.zones.map((z) => ({ subnet: '', ...z })) : []
       this.selectedIds = []
       this.linkingFromId = null
-      bumpIdCounterFrom([this.nodes, this.links, this.zones, this.racks, this.vlans])
+      bumpIdCounterFrom([
+        this.nodes,
+        this.links,
+        this.zones,
+        this.racks,
+        this.vlans,
+        this.sites,
+        this.tunnels,
+        this.nodes.flatMap((n) => n.interfaces),
+      ])
     },
 
     saveToLocalStorage() {
