@@ -1,0 +1,9 @@
+id,type,label,links
+rt1,router,Routeur Internet,
+sw1,switch,Switch principal,rt1
+fw1,firewall,Firewall,rt1
+ap1,ap,AP Bureau,sw1
+srv1,server,Serveur fichiers,sw1
+pc1,pc,Poste 1,sw1
+pc2,pc,Poste 2,sw1
+iot1,iot,Caméra,ap1

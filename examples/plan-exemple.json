@@ -1,0 +1,10 @@
+[
+  { "id": "rt1", "type": "router", "label": "Routeur Internet", "links": [] },
+  { "id": "sw1", "type": "switch", "label": "Switch principal", "links": ["rt1"] },
+  { "id": "fw1", "type": "firewall", "label": "Firewall", "links": ["rt1"] },
+  { "id": "ap1", "type": "ap", "label": "AP Bureau", "links": ["sw1"] },
+  { "id": "srv1", "type": "server", "label": "Serveur fichiers", "links": ["sw1"] },
+  { "id": "pc1", "type": "pc", "label": "Poste 1", "links": ["sw1"] },
+  { "id": "pc2", "type": "pc", "label": "Poste 2", "links": ["sw1"] },
+  { "id": "iot1", "type": "iot", "label": "Caméra", "links": ["ap1"] }
+]
