@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { pointInSite } from '../utils/siteLayout'
+import { screenToCanvas } from '../utils/viewport'
 
 const props = defineProps({
   zone: { type: Object, required: true },
@@ -17,8 +18,7 @@ const siteName = computed(() => store.sites.find((s) => s.id === props.zone.site
 const PALETTE = ['#38bdf8', '#a78bfa', '#4ade80', '#fb923c', '#f472b6', '#94a3b8']
 
 function toSvgPoint(svg, event) {
-  const rect = svg.getBoundingClientRect()
-  return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  return screenToCanvas(event.clientX, event.clientY, svg, { x: store.viewPanX, y: store.viewPanY }, store.viewZoom)
 }
 
 let dragOffset = null

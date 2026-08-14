@@ -9,23 +9,47 @@ import SiteFrame from './SiteFrame.vue'
 import TunnelLink from './TunnelLink.vue'
 import ExportLegend from './ExportLegend.vue'
 import FirewallRulesExport from './FirewallRulesExport.vue'
+import ZoomControls from './ZoomControls.vue'
 import { rackBounds } from '../utils/rackLayout'
 import { siteDisplaySize } from '../utils/siteLayout'
+import { screenToCanvas } from '../utils/viewport'
 
 const store = usePlanStore()
 const cursor = ref({ x: 0, y: 0 })
 const marquee = ref(null)
+const spacePressed = ref(false)
+const isPanning = ref(false)
 
 const linkSourceNode = computed(() => store.nodes.find((n) => n.id === store.linkingFromId) ?? null)
 const exportRuleNodes = computed(() =>
   store.exportMode ? store.visibleNodes.filter((n) => n.exposedPorts.length) : [],
 )
 
+function isTypingTarget(target) {
+  return ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)
+}
+
+function toCanvasPoint(svg, event) {
+  return screenToCanvas(event.clientX, event.clientY, svg, { x: store.viewPanX, y: store.viewPanY }, store.viewZoom)
+}
+
+let panStart = null
 let marqueeStart = null
 let didDrag = false
 const DRAG_THRESHOLD = 4
 
 function onSvgPointerDown(event) {
+  // Pan : clic molette, ou barre espace maintenue + clic gauche. Prioritaire sur
+  // tout le reste (ne doit jamais démarrer un tracé de câble ni une sélection).
+  if (event.button === 1 || (event.button === 0 && spacePressed.value)) {
+    event.preventDefault()
+    isPanning.value = true
+    panStart = { x: event.clientX, y: event.clientY, panX: store.viewPanX, panY: store.viewPanY }
+    window.addEventListener('pointermove', onPanMove)
+    window.addEventListener('pointerup', onPanUp)
+    return
+  }
+
   if (store.linkingFromId) {
     // Clic dans le vide pendant un câble en cours de tracé : annule (le mode reste actif).
     store.cancelLinking()
@@ -34,18 +58,28 @@ function onSvgPointerDown(event) {
   // Mode relier/tunnel en attente du premier nœud : rien à faire sur fond vide.
   if (store.linkMode || store.tunnelMode) return
 
-  const rect = event.currentTarget.getBoundingClientRect()
-  marqueeStart = { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  const point = toCanvasPoint(event.currentTarget, event)
+  marqueeStart = point
   didDrag = false
   window.addEventListener('pointermove', onMarqueeMove)
   window.addEventListener('pointerup', onMarqueeUp)
 }
 
+function onPanMove(event) {
+  if (!panStart) return
+  store.setPan(panStart.panX + (event.clientX - panStart.x), panStart.panY + (event.clientY - panStart.y))
+}
+function onPanUp() {
+  panStart = null
+  isPanning.value = false
+  window.removeEventListener('pointermove', onPanMove)
+  window.removeEventListener('pointerup', onPanUp)
+}
+
 function onMarqueeMove(event) {
   if (!marqueeStart) return
   const svg = document.querySelector('.canvas-board svg')
-  const rect = svg.getBoundingClientRect()
-  const point = { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  const point = toCanvasPoint(svg, event)
   const dx = point.x - marqueeStart.x
   const dy = point.y - marqueeStart.y
 
@@ -106,8 +140,19 @@ function onMarqueeUp(event) {
 
 function onPointerMove(event) {
   if (!store.linkingFromId) return
-  const rect = event.currentTarget.getBoundingClientRect()
-  cursor.value = { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  cursor.value = toCanvasPoint(event.currentTarget, event)
+}
+
+function onWheel(event) {
+  const svg = event.currentTarget
+  const rect = svg.getBoundingClientRect()
+  const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1
+  store.zoomAtScreenPoint(event.clientX - rect.left, event.clientY - rect.top, factor)
+}
+
+function fitToContent() {
+  const el = document.querySelector('.canvas-board')
+  if (el) store.fitToContent(el.clientWidth, el.clientHeight)
 }
 
 function onKeydown(event) {
@@ -126,58 +171,95 @@ function onKeydown(event) {
       store.clearSelection()
     }
   }
+  if (event.code === 'Space' && !isTypingTarget(event.target)) {
+    // Évite que la page défile pendant qu'on maintient espace pour naviguer.
+    event.preventDefault()
+    spacePressed.value = true
+  }
+  if (event.key === '0' && !isTypingTarget(event.target)) {
+    fitToContent()
+  }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+function onKeyup(event) {
+  if (event.code === 'Space') spacePressed.value = false
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  window.addEventListener('keyup', onKeyup)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('keyup', onKeyup)
+})
 </script>
 
 <template>
-  <div class="canvas-board">
-    <svg width="100%" height="100%" @pointerdown="onSvgPointerDown" @pointermove="onPointerMove">
+  <div class="canvas-board" :class="{ panning: isPanning, 'space-pan': spacePressed }">
+    <svg
+      width="100%"
+      height="100%"
+      @pointerdown="onSvgPointerDown"
+      @pointermove="onPointerMove"
+      @wheel.prevent="onWheel"
+    >
       <defs>
         <pattern id="canvas-grid" width="24" height="24" patternUnits="userSpaceOnUse">
           <circle cx="1" cy="1" r="1" class="grid-dot" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" class="canvas-bg" />
-      <rect width="100%" height="100%" fill="url(#canvas-grid)" />
 
-      <SiteFrame v-for="site in store.sites" :key="site.id" :site="site" />
-      <ZoneRect v-for="zone in store.zones" :key="zone.id" :zone="zone" />
-      <RackFrame v-for="rack in store.racks" :key="rack.id" :rack="rack" />
-      <NetworkLink v-for="link in store.links" :key="link.id" :link="link" />
-      <TunnelLink v-for="tunnel in store.tunnels" :key="tunnel.id" :tunnel="tunnel" />
-      <NetworkNode v-for="node in store.visibleNodes" :key="node.id" :node="node" />
-      <FirewallRulesExport v-for="node in exportRuleNodes" :key="node.id" :node="node" />
-      <ExportLegend v-if="store.exportMode" />
+      <g :transform="store.viewTransform">
+        <!-- Grille surdimensionnée pour couvrir tout panoramique raisonnable. -->
+        <rect x="-20000" y="-20000" width="40000" height="40000" fill="url(#canvas-grid)" />
 
-      <line
-        v-if="linkSourceNode"
-        :x1="linkSourceNode.x"
-        :y1="linkSourceNode.y"
-        :x2="cursor.x"
-        :y2="cursor.y"
-        class="ghost-link"
-        :class="{ tunnel: store.tunnelMode }"
-      />
+        <SiteFrame v-for="site in store.sites" :key="site.id" :site="site" />
+        <ZoneRect v-for="zone in store.zones" :key="zone.id" :zone="zone" />
+        <RackFrame v-for="rack in store.racks" :key="rack.id" :rack="rack" />
+        <NetworkLink v-for="link in store.links" :key="link.id" :link="link" />
+        <TunnelLink v-for="tunnel in store.tunnels" :key="tunnel.id" :tunnel="tunnel" />
+        <NetworkNode v-for="node in store.visibleNodes" :key="node.id" :node="node" />
+        <FirewallRulesExport v-for="node in exportRuleNodes" :key="node.id" :node="node" />
+        <ExportLegend v-if="store.exportMode" />
 
-      <rect
-        v-if="marquee"
-        :x="marquee.x"
-        :y="marquee.y"
-        :width="marquee.width"
-        :height="marquee.height"
-        class="marquee-rect"
-      />
+        <line
+          v-if="linkSourceNode"
+          :x1="linkSourceNode.x"
+          :y1="linkSourceNode.y"
+          :x2="cursor.x"
+          :y2="cursor.y"
+          class="ghost-link"
+          :class="{ tunnel: store.tunnelMode }"
+        />
+
+        <rect
+          v-if="marquee"
+          :x="marquee.x"
+          :y="marquee.y"
+          :width="marquee.width"
+          :height="marquee.height"
+          class="marquee-rect"
+        />
+      </g>
     </svg>
+
+    <ZoomControls />
   </div>
 </template>
 
 <style scoped>
 .canvas-board {
+  position: relative;
   flex: 1;
   height: 100%;
+}
+.canvas-board.space-pan svg {
+  cursor: grab;
+}
+.canvas-board.panning svg {
+  cursor: grabbing;
 }
 svg {
   display: block;

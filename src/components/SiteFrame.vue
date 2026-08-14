@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { siteDisplaySize } from '../utils/siteLayout'
+import { screenToCanvas } from '../utils/viewport'
 
 const props = defineProps({
   site: { type: Object, required: true },
@@ -13,8 +14,7 @@ const size = computed(() => siteDisplaySize(props.site))
 const memberCount = computed(() => store.nodes.filter((n) => n.siteId === props.site.id).length)
 
 function toSvgPoint(svg, event) {
-  const rect = svg.getBoundingClientRect()
-  return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  return screenToCanvas(event.clientX, event.clientY, svg, { x: store.viewPanX, y: store.viewPanY }, store.viewZoom)
 }
 
 let dragOffset = null

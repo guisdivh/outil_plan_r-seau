@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { usePlanStore } from '../stores/plan'
+import { screenToCanvas } from '../utils/viewport'
 
 const props = defineProps({
   link: { type: Object, required: true },
@@ -46,8 +47,7 @@ const midPoint = computed(() => {
 })
 
 function toSvgPoint(svg, event) {
-  const rect = svg.getBoundingClientRect()
-  return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  return screenToCanvas(event.clientX, event.clientY, svg, { x: store.viewPanX, y: store.viewPanY }, store.viewZoom)
 }
 
 function onLinePointerDown(event) {

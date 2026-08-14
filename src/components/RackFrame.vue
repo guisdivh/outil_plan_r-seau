@@ -9,6 +9,7 @@ import {
   rackUnitLabel,
 } from '../utils/rackLayout'
 import { pointInSite } from '../utils/siteLayout'
+import { screenToCanvas } from '../utils/viewport'
 
 const props = defineProps({
   rack: { type: Object, required: true },
@@ -22,8 +23,7 @@ const siteName = computed(() => store.sites.find((s) => s.id === props.rack.site
 const memberCount = computed(() => store.nodes.filter((n) => n.rackId === props.rack.id).length)
 
 function toSvgPoint(svg, event) {
-  const rect = svg.getBoundingClientRect()
-  return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  return screenToCanvas(event.clientX, event.clientY, svg, { x: store.viewPanX, y: store.viewPanY }, store.viewZoom)
 }
 
 let dragOffset = null

@@ -17,10 +17,12 @@ function collectStylesheetText() {
   return css
 }
 
-// Clone le SVG affiché en figeant sa taille en pixels (au lieu de 100%/100%)
-// pour obtenir un fichier exporté cohérent quelle que soit la taille de la fenêtre.
-function serializeSvg(svgEl) {
-  const rect = svgEl.getBoundingClientRect()
+// Clone le SVG affiché en figeant sa taille en pixels (au lieu de 100%/100%).
+// `size` (optionnel) force une largeur/hauteur explicite : indispensable pour
+// l'export, où on veut capturer tout le contenu du plan (voir setViewForExport
+// dans le store), pas juste la fenêtre visible à l'écran.
+function serializeSvg(svgEl, size) {
+  const rect = size ?? svgEl.getBoundingClientRect()
   const clone = svgEl.cloneNode(true)
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
   clone.setAttribute('width', rect.width)
@@ -38,13 +40,13 @@ function serializeSvg(svgEl) {
   return { markup, width: rect.width, height: rect.height }
 }
 
-export function exportSvg(svgEl, filename) {
-  const { markup } = serializeSvg(svgEl)
+export function exportSvg(svgEl, filename, size) {
+  const { markup } = serializeSvg(svgEl, size)
   downloadBlob(new Blob([markup], { type: 'image/svg+xml' }), filename)
 }
 
-export function exportPng(svgEl, filename) {
-  const { markup, width, height } = serializeSvg(svgEl)
+export function exportPng(svgEl, filename, size) {
+  const { markup, width, height } = serializeSvg(svgEl, size)
   const svgBlob = new Blob([markup], { type: 'image/svg+xml;charset=utf-8' })
   const url = URL.createObjectURL(svgBlob)
 

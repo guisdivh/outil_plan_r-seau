@@ -7,6 +7,9 @@ import { closestSegmentIndex } from '../utils/waypoints'
 import { computeLinkRoutes } from '../utils/linkRouting'
 import { siteDisplaySize } from '../utils/siteLayout'
 import { resolveEffectiveNodes } from '../utils/nodeVisibility'
+import { computePlanBounds } from '../utils/planBounds'
+import { MIN_ZOOM, MAX_ZOOM } from '../utils/viewport'
+import { canBeTunnelEndpoint } from '../constants/equipmentTypes'
 
 const STORAGE_KEY = 'outil-plan-reseau:plan'
 
@@ -53,6 +56,10 @@ export const usePlanStore = defineStore('plan', {
     // Actif brièvement pendant un export : force l'affichage exhaustif
     // (IP, labels/VLAN des câbles, phase des tunnels) sur le rendu déjà à l'écran.
     exportMode: false,
+    // Vue du canvas (pan/zoom) : réglage d'affichage, pas une donnée du plan.
+    viewPanX: 0,
+    viewPanY: 0,
+    viewZoom: 1,
   }),
 
   getters: {
@@ -85,6 +92,7 @@ export const usePlanStore = defineStore('plan', {
       }
       return map
     },
+    viewTransform: (state) => `translate(${state.viewPanX}, ${state.viewPanY}) scale(${state.viewZoom})`,
   },
 
   actions: {
@@ -168,6 +176,69 @@ export const usePlanStore = defineStore('plan', {
       this.exportMode = value
     },
 
+    setPan(x, y) {
+      this.viewPanX = x
+      this.viewPanY = y
+    },
+
+    // Restaure un niveau de zoom exact (ex : après un cadrage temporaire pour export).
+    setZoom(zoom) {
+      this.viewZoom = zoom
+    },
+
+    // Zoom centré sur un point écran donné (curseur pour la molette, centre du
+    // canvas pour les boutons +/-) : ce point doit rester sous le même pixel.
+    zoomAtScreenPoint(screenX, screenY, factor) {
+      const oldZoom = this.viewZoom
+      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, oldZoom * factor))
+      const canvasX = (screenX - this.viewPanX) / oldZoom
+      const canvasY = (screenY - this.viewPanY) / oldZoom
+      this.viewPanX = screenX - canvasX * newZoom
+      this.viewPanY = screenY - canvasY * newZoom
+      this.viewZoom = newZoom
+    },
+
+    resetView() {
+      this.viewPanX = 0
+      this.viewPanY = 0
+      this.viewZoom = 1
+    },
+
+    // Cadre l'ensemble du plan dans la zone visible (taille du conteneur canvas en px).
+    fitToContent(viewportWidth, viewportHeight) {
+      const bounds = computePlanBounds(this.nodes, this.zones, this.racks, this.sites, this.links)
+      const margin = 60
+      const contentWidth = Math.max(1, bounds.maxX - bounds.minX)
+      const contentHeight = Math.max(1, bounds.maxY - bounds.minY)
+      const zoom = Math.max(
+        MIN_ZOOM,
+        Math.min(
+          MAX_ZOOM,
+          Math.min(
+            (viewportWidth - margin * 2) / contentWidth,
+            (viewportHeight - margin * 2) / contentHeight,
+          ),
+        ),
+      )
+      this.viewZoom = zoom
+      this.viewPanX = viewportWidth / 2 - ((bounds.minX + bounds.maxX) / 2) * zoom
+      this.viewPanY = viewportHeight / 2 - ((bounds.minY + bounds.maxY) / 2) * zoom
+    },
+
+    // Cadre le plan entier à l'échelle 1:1 pour l'export (pas la fenêtre actuelle).
+    // Retourne la taille exacte de contenu à utiliser pour dimensionner le SVG exporté.
+    setViewForExport() {
+      const bounds = computePlanBounds(this.nodes, this.zones, this.racks, this.sites, this.links)
+      const margin = 40
+      this.viewZoom = 1
+      this.viewPanX = margin - bounds.minX
+      this.viewPanY = margin - bounds.minY
+      return {
+        width: bounds.maxX - bounds.minX + margin * 2,
+        height: bounds.maxY - bounds.minY + margin * 2,
+      }
+    },
+
     renameNode(id, label) {
       const node = this.nodes.find((n) => n.id === id)
       if (node) node.label = label
@@ -222,6 +293,11 @@ export const usePlanStore = defineStore('plan', {
     },
 
     startLinking(id, kind = 'cable') {
+      // Un tunnel ne peut démarrer que depuis une passerelle (routeur/firewall).
+      if (kind === 'tunnel') {
+        const node = this.nodes.find((n) => n.id === id)
+        if (!node || !canBeTunnelEndpoint(node.type)) return
+      }
       this.linkingFromId = id
       this.linkingKind = kind
     },
@@ -257,6 +333,9 @@ export const usePlanStore = defineStore('plan', {
       if (!sourceId || sourceId === targetId) return
 
       if (kind === 'tunnel') {
+        const source = this.nodes.find((n) => n.id === sourceId)
+        const target = this.nodes.find((n) => n.id === targetId)
+        if (!canBeTunnelEndpoint(source?.type) || !canBeTunnelEndpoint(target?.type)) return
         const alreadyTunneled = this.tunnels.some(
           (t) =>
             (t.sourceId === sourceId && t.targetId === targetId) ||

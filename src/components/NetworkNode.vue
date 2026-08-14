@@ -6,6 +6,8 @@ import { RACK_WIDTH, RACK_UNIT_HEIGHT, pointInRack } from '../utils/rackLayout'
 import { formatInterface } from '../utils/interfaces'
 import { pointInSite } from '../utils/siteLayout'
 import { canExposePorts, summarizeRule } from '../utils/exposedPorts'
+import { screenToCanvas } from '../utils/viewport'
+import { canBeTunnelEndpoint } from '../constants/equipmentTypes'
 import IconRouter from './icons/IconRouter.vue'
 import IconSwitch from './icons/IconSwitch.vue'
 import IconFirewall from './icons/IconFirewall.vue'
@@ -37,6 +39,11 @@ const iconComponent = computed(() => {
 
 const isSelected = computed(() => store.selectedIds.includes(props.node.id))
 const isLinkSource = computed(() => store.linkingFromId === props.node.id)
+// En mode tunnel, seuls routeurs/firewalls peuvent servir d'extrémité :
+// les autres nœuds sont visuellement désactivés pour éviter un clic sans effet.
+const isTunnelIneligible = computed(
+  () => store.tunnelMode && !canBeTunnelEndpoint(props.node.type),
+)
 const zoneName = computed(() => store.zones.find((z) => z.id === props.node.zoneId)?.name ?? null)
 const isRacked = computed(() => !!props.node.rackId)
 const rackNodeHeight = computed(() => props.node.rackSpan * RACK_UNIT_HEIGHT - 2)
@@ -142,8 +149,7 @@ function onPointerUp() {
 }
 
 function toSvgPoint(svg, event) {
-  const rect = svg.getBoundingClientRect()
-  return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  return screenToCanvas(event.clientX, event.clientY, svg, { x: store.viewPanX, y: store.viewPanY }, store.viewZoom)
 }
 </script>
 
@@ -151,7 +157,7 @@ function toSvgPoint(svg, event) {
   <g
     v-if="!isRacked"
     class="network-node"
-    :class="{ selected: isSelected, linking: isLinkSource }"
+    :class="{ selected: isSelected, linking: isLinkSource, 'tunnel-ineligible': isTunnelIneligible }"
     :transform="`translate(${node.x - 28}, ${node.y - 28})`"
     @pointerdown="onPointerDown"
     @contextmenu.prevent
@@ -191,7 +197,7 @@ function toSvgPoint(svg, event) {
   <g
     v-else
     class="network-node racked"
-    :class="{ selected: isSelected }"
+    :class="{ selected: isSelected, 'tunnel-ineligible': isTunnelIneligible }"
     :transform="`translate(${node.x - RACK_WIDTH / 2 + 4}, ${node.y - rackNodeHeight / 2})`"
     @pointerdown="onPointerDown"
     @contextmenu.prevent
@@ -208,6 +214,10 @@ function toSvgPoint(svg, event) {
 <style scoped>
 .network-node {
   cursor: grab;
+}
+.network-node.tunnel-ineligible {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 .node-card {
   fill: var(--color-surface);

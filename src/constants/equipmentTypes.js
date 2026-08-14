@@ -19,3 +19,11 @@ export function equipmentByType(type) {
 export function rackSpanByType(type) {
   return equipmentByType(type)?.rackSpan ?? 1
 }
+
+// Un tunnel IPsec relie deux passerelles : seuls routeurs et firewalls peuvent
+// être extrémité d'un tunnel (pas de sens pour un switch, poste, IoT...).
+export const TUNNEL_ENDPOINT_TYPES = ['router', 'firewall']
+
+export function canBeTunnelEndpoint(type) {
+  return TUNNEL_ENDPOINT_TYPES.includes(type)
+}
