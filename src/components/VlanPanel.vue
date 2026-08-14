@@ -55,49 +55,54 @@ const PALETTE = ['#a78bfa', '#38bdf8', '#4ade80', '#fb923c', '#f472b6', '#94a3b8
   left: 16px;
   z-index: 10;
   width: 340px;
-  padding: 12px;
-  background: #fff;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
 }
 .vlan-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
 }
 .close-button {
   border: none;
   background: none;
-  font-size: 16px;
+  font-size: var(--text-md);
   line-height: 1;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--color-text-muted);
 }
 .vlan-empty {
-  font-size: 12px;
-  color: #9ca3af;
-  margin: 4px 0 12px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 var(--space-3);
 }
 .vlan-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
 }
 .vlan-number {
   width: 56px;
-  padding: 4px 6px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 .vlan-name {
   flex: 1;
   min-width: 0;
-  padding: 4px 6px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 .vlan-swatches {
   display: flex;
@@ -112,22 +117,28 @@ const PALETTE = ['#a78bfa', '#38bdf8', '#4ade80', '#fb923c', '#f472b6', '#94a3b8
   padding: 0;
 }
 .vlan-swatch.active {
-  border-color: #1f2937;
+  border-color: var(--color-text);
 }
 .vlan-delete {
-  padding: 4px 8px;
-  font-size: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #fff;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
   cursor: pointer;
 }
+.vlan-delete:hover,
+.vlan-add:hover {
+  background: var(--color-surface-2);
+}
 .vlan-add {
-  margin-top: 4px;
-  padding: 6px 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
   cursor: pointer;
 }
 </style>

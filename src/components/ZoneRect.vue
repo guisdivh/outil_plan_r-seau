@@ -101,7 +101,7 @@ function rename() {
       :fill="zone.color"
       fill-opacity="0.15"
       :stroke="zone.color"
-      stroke-width="2"
+      :stroke-width="isSelected ? 3 : 2"
       @pointerdown="onBodyPointerDown"
       @dblclick="rename"
     />
@@ -117,7 +117,7 @@ function rename() {
         :cy="zone.y + zone.height - 12"
         r="6"
         :fill="color"
-        stroke="#fff"
+        stroke="var(--color-surface)"
         stroke-width="1"
         @pointerdown.stop="store.setZoneColor(zone.id, color)"
       />
@@ -143,13 +143,13 @@ function rename() {
 }
 .zone-assigned-highlight {
   fill: none;
-  stroke: #16a34a;
+  stroke: var(--color-success);
   stroke-width: 3;
   stroke-dasharray: 6 3;
   pointer-events: none;
 }
 .resize-handle {
-  fill: #1f2937;
+  fill: var(--color-text);
   cursor: nwse-resize;
 }
 .zone-palette circle {

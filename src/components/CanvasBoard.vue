@@ -7,6 +7,7 @@ import ZoneRect from './ZoneRect.vue'
 import RackFrame from './RackFrame.vue'
 import SiteFrame from './SiteFrame.vue'
 import TunnelLink from './TunnelLink.vue'
+import ExportLegend from './ExportLegend.vue'
 import { rackBounds } from '../utils/rackLayout'
 import { siteDisplaySize } from '../utils/siteLayout'
 
@@ -130,7 +131,13 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 <template>
   <div class="canvas-board">
     <svg width="100%" height="100%" @pointerdown="onSvgPointerDown" @pointermove="onPointerMove">
-      <rect width="100%" height="100%" fill="#fafafa" />
+      <defs>
+        <pattern id="canvas-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="1" class="grid-dot" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" class="canvas-bg" />
+      <rect width="100%" height="100%" fill="url(#canvas-grid)" />
 
       <SiteFrame v-for="site in store.sites" :key="site.id" :site="site" />
       <ZoneRect v-for="zone in store.zones" :key="zone.id" :zone="zone" />
@@ -138,6 +145,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       <NetworkLink v-for="link in store.links" :key="link.id" :link="link" />
       <TunnelLink v-for="tunnel in store.tunnels" :key="tunnel.id" :tunnel="tunnel" />
       <NetworkNode v-for="node in store.visibleNodes" :key="node.id" :node="node" />
+      <ExportLegend v-if="store.exportMode" />
 
       <line
         v-if="linkSourceNode"
@@ -169,19 +177,26 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 svg {
   display: block;
 }
+.canvas-bg {
+  fill: var(--color-bg);
+}
+.grid-dot {
+  fill: var(--color-border-strong);
+  opacity: 0.5;
+}
 .ghost-link {
-  stroke: #f59e0b;
+  stroke: var(--color-warning);
   stroke-width: 2;
   stroke-dasharray: 5 4;
   pointer-events: none;
 }
 .ghost-link.tunnel {
-  stroke: #7c3aed;
+  stroke: var(--color-tunnel);
   stroke-dasharray: 6 4;
 }
 .marquee-rect {
-  fill: rgba(37, 99, 235, 0.1);
-  stroke: #2563eb;
+  fill: rgba(59, 130, 246, 0.15);
+  stroke: var(--color-accent);
   stroke-width: 1;
   stroke-dasharray: 4 3;
   pointer-events: none;

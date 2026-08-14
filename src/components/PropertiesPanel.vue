@@ -118,94 +118,104 @@ const rackName = computed(() => {
 <style scoped>
 .properties-panel {
   width: 260px;
-  padding: 16px;
-  border-left: 1px solid #e5e7eb;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
   overflow-y: auto;
 }
 .properties-panel h2 {
-  font-size: 14px;
+  font-size: var(--text-sm);
   text-transform: uppercase;
-  color: #6b7280;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
   margin: 0;
 }
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  color: #374151;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text);
 }
 .field input,
 .field select {
-  padding: 6px 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 .info-line {
   margin: 0;
-  font-size: 12px;
-  color: #6b7280;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 .multi-hint {
   margin: 0;
-  font-size: 12px;
-  color: #9ca3af;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 .interfaces {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #e5e7eb;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
 }
 .interfaces-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
-  color: #374151;
+  color: var(--color-text);
 }
 .interfaces-header button {
-  padding: 3px 8px;
-  font-size: 11px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #fff;
+  padding: 3px var(--space-2);
+  font-size: var(--text-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
   cursor: pointer;
+}
+.interfaces-header button:hover {
+  background: var(--color-surface-2);
 }
 .iface-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #f9fafb;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
 }
 .iface-row input,
 .iface-row select {
   padding: 5px 6px;
-  font-size: 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 .iface-row-top {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 .iface-row-top select {
   flex: 1;
 }
 .iface-delete {
   width: 24px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
   cursor: pointer;
-  color: #dc2626;
+  color: var(--color-danger);
 }
 </style>

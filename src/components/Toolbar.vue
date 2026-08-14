@@ -1,15 +1,22 @@
 <script setup>
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { downloadText } from '../utils/download'
 import { exportSvg, exportPng } from '../utils/export'
 import { parseImportItems } from '../utils/importData'
 import VlanPanel from './VlanPanel.vue'
+import { applyTheme, effectiveTheme } from '../utils/theme'
 
 const store = usePlanStore()
 const fileInput = ref(null)
 const dataFileInput = ref(null)
 const showVlans = ref(false)
+const theme = ref(effectiveTheme())
+
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  applyTheme(theme.value)
+}
 
 function addZone() {
   store.addZone()
@@ -58,12 +65,32 @@ async function onDataFileChange(event) {
   event.target.value = ''
 }
 
+// Bascule brièvement en mode « tout afficher » + thème clair forcé le temps
+// de la capture, puis restaure l'affichage écran tel qu'il était. Le clonage
+// du SVG dans exportSvg/exportPng est synchrone : on peut annuler dès après.
+async function withExportMode(capture) {
+  const previousTheme = document.documentElement.dataset.theme
+  document.documentElement.dataset.theme = 'light'
+  store.setExportMode(true)
+  await nextTick()
+  try {
+    capture()
+  } finally {
+    store.setExportMode(false)
+    if (previousTheme) {
+      document.documentElement.dataset.theme = previousTheme
+    } else {
+      delete document.documentElement.dataset.theme
+    }
+  }
+}
+
 function onExportSvg() {
-  exportSvg(document.querySelector('.canvas-board svg'), 'plan-reseau.svg')
+  withExportMode(() => exportSvg(document.querySelector('.canvas-board svg'), 'plan-reseau.svg'))
 }
 
 function onExportPng() {
-  exportPng(document.querySelector('.canvas-board svg'), 'plan-reseau.png')
+  withExportMode(() => exportPng(document.querySelector('.canvas-board svg'), 'plan-reseau.png'))
 }
 </script>
 
@@ -133,6 +160,12 @@ function onExportPng() {
       class="hidden-input"
       @change="onDataFileChange"
     />
+
+    <span class="sep" />
+
+    <button type="button" title="Basculer entre thème clair et sombre." @click="toggleTheme">
+      {{ theme === 'dark' ? '☀️ Clair' : '🌙 Sombre' }}
+    </button>
   </header>
 </template>
 
@@ -141,28 +174,35 @@ function onExportPng() {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-bottom: 1px solid #e5e7eb;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
 .title {
-  margin-right: 16px;
+  margin-right: var(--space-4);
+  color: var(--color-text);
+  font-size: var(--text-md);
 }
 .sep {
   width: 1px;
   height: 20px;
-  background: #e5e7eb;
-  margin: 0 4px;
+  background: var(--color-border);
+  margin: 0 var(--space-1);
 }
 button {
-  padding: 6px 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
   cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 button:hover {
-  background: #f3f4f6;
+  background: var(--color-surface-2);
+  border-color: var(--color-border-strong);
 }
 .hidden-input {
   display: none;
@@ -173,7 +213,7 @@ button:hover {
   color: #fff;
 }
 .mode-button.tunnel.active {
-  background: #7c3aed;
-  border-color: #6d28d9;
+  background: var(--color-tunnel);
+  border-color: var(--color-tunnel);
 }
 </style>

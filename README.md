@@ -16,8 +16,12 @@ Voir [`prompts/`](./prompts) — chaque fichier est une étape à donner à l'as
 8. [VLANs](./prompts/08-vlans.md) — entité de première classe, prérequis des câbles taggés. ✅
 9. [Câbles enrichis](./prompts/09-link-enrichment.md) — nom, VLAN natif, waypoints. ✅
 10. [Routage anti-chevauchement](./prompts/10-link-routing.md) — tracé orthogonal auto, surchargeable à la main. ✅
-11. [Panneau de propriétés](./prompts/11-properties-panel.md) — édition des équipements, gestion multi-sélection.
-12. [Adressage IP structuré](./prompts/12-ip-addressing.md) — interfaces multi-IP par équipement.
-13. [Sites distants + tunnels IPsec](./prompts/13-remote-sites-ipsec.md) — sites repliables, tunnels logiques.
+11. [Panneau de propriétés](./prompts/11-properties-panel.md) — édition des équipements, gestion multi-sélection. ✅
+12. [Adressage IP structuré](./prompts/12-ip-addressing.md) — interfaces multi-IP par équipement. ✅
+13. [Sites distants + tunnels IPsec](./prompts/13-remote-sites-ipsec.md) — sites repliables, tunnels logiques. ✅
+14. [Système de design + thème clair/sombre](./prompts/14-design-system-theme.md) — variables CSS, palette, deux thèmes.
+15. [Habillage des panneaux](./prompts/15-panels-styling.md) — toolbar, palette, propriétés, VLAN.
+16. [Rendu du canvas](./prompts/16-canvas-rendering.md) — fond, grille, nœuds, liens, thème.
+17. [Vue d'export PNG exhaustive](./prompts/17-export-view.md) — écran ≠ export, tout afficher au rendu final.
 
 Le code du projet Vue est scaffoldé à la racine de ce dossier (étape 1).

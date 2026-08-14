@@ -13,9 +13,22 @@ const target = computed(() => store.nodes.find((n) => n.id === props.link.target
 const isSelected = computed(() => store.selectedIds.includes(props.link.id))
 
 const vlan = computed(() => store.vlans.find((v) => v.id === props.link.vlanId) ?? null)
-const color = computed(() => vlan.value?.color ?? '#64748b')
+const color = computed(() => vlan.value?.color ?? 'var(--color-link)')
 
 const vlanSwatches = computed(() => [{ id: null, color: '#94a3b8' }, ...store.vlans.map((v) => ({ id: v.id, color: v.color }))])
+
+// À l'écran : étiquette seulement si nommé ou sélectionné. En export : nom +
+// VLAN toujours visibles, pour un rendu exhaustif indépendant de l'affichage écran.
+const displayLabel = computed(() => {
+  if (store.exportMode) {
+    const parts = []
+    if (props.link.label) parts.push(props.link.label)
+    if (vlan.value) parts.push(`VLAN ${vlan.value.number}`)
+    return parts.join(' · ')
+  }
+  if (props.link.label) return props.link.label
+  return isSelected.value ? 'nommer le câble' : ''
+})
 
 // Tracé orthogonal auto (avec écartement des câbles d'un même équipement), ou
 // tracé libre à travers les waypoints manuels s'il y en a — voir utils/linkRouting.js.
@@ -85,6 +98,8 @@ function rename() {
 
 <template>
   <g v-if="source && target" class="network-link-group">
+    <!-- Halo de sélection : ne modifie jamais la couleur VLAN du trait lui-même. -->
+    <polyline v-if="isSelected" :points="pointsAttr" fill="none" class="selection-halo" />
     <!-- Zone de clic élargie et invisible : le trait visible reste fin. -->
     <polyline :points="pointsAttr" fill="none" stroke="transparent" stroke-width="14" class="hit-area" @pointerdown="onLinePointerDown" @dblclick="onLineDoubleClick" />
     <polyline
@@ -107,7 +122,7 @@ function rename() {
     />
 
     <text
-      v-if="link.label || isSelected"
+      v-if="displayLabel"
       :x="midPoint.x"
       :y="midPoint.y - 8"
       text-anchor="middle"
@@ -115,7 +130,7 @@ function rename() {
       @pointerdown.stop
       @dblclick.stop="rename"
     >
-      {{ link.label || 'nommer le câble' }}
+      {{ displayLabel }}
     </text>
 
     <g v-if="isSelected" class="link-vlan-palette">
@@ -126,7 +141,7 @@ function rename() {
         :cy="midPoint.y + 10"
         r="6"
         :fill="sw.color"
-        :stroke="link.vlanId === sw.id ? '#1f2937' : '#fff'"
+        :stroke="link.vlanId === sw.id ? 'var(--color-text)' : 'var(--color-surface)'"
         stroke-width="1.5"
         @pointerdown.stop="store.setLinkVlan(link.id, sw.id)"
       />
@@ -138,18 +153,25 @@ function rename() {
 .network-link {
   pointer-events: none;
 }
+.selection-halo {
+  stroke: var(--color-accent);
+  stroke-width: 7;
+  stroke-linecap: round;
+  opacity: 0.25;
+  pointer-events: none;
+}
 .hit-area {
   cursor: pointer;
 }
 .waypoint {
-  fill: #fff;
-  stroke: #1f2937;
+  fill: var(--color-surface);
+  stroke: var(--color-text);
   stroke-width: 1.5;
   cursor: grab;
 }
 .link-label {
   font-size: 10px;
-  fill: #374151;
+  fill: var(--color-text);
   cursor: pointer;
   user-select: none;
 }

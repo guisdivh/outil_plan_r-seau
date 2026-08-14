@@ -124,9 +124,8 @@ function rename() {
 
 <style scoped>
 .site-body {
-  fill: #eef2ff;
-  fill-opacity: 0.5;
-  stroke: #6366f1;
+  fill: var(--color-site-bg);
+  stroke: var(--color-site-border);
   stroke-width: 2;
   stroke-dasharray: 8 4;
 }
@@ -136,23 +135,23 @@ function rename() {
 .site-title {
   font-size: 13px;
   font-weight: 700;
-  fill: #4338ca;
+  fill: var(--color-site-border);
   user-select: none;
 }
 .site-toggle {
   font-size: 10px;
-  fill: #4338ca;
+  fill: var(--color-site-border);
   cursor: pointer;
   user-select: none;
 }
 .site-count {
   font-size: 12px;
-  fill: #4338ca;
+  fill: var(--color-site-border);
   font-style: italic;
   user-select: none;
 }
 .resize-handle {
-  fill: #1f2937;
+  fill: var(--color-text);
   cursor: nwse-resize;
 }
 </style>

@@ -68,7 +68,7 @@ function editPhase() {
       🔒 {{ tunnel.name || 'tunnel IPsec' }}
     </text>
     <text
-      v-if="tunnel.phase || isSelected"
+      v-if="tunnel.phase || (isSelected && !store.exportMode)"
       :x="midPoint.x"
       :y="midPoint.y + 10"
       text-anchor="middle"
@@ -83,7 +83,7 @@ function editPhase() {
 
 <style scoped>
 .tunnel-line {
-  stroke: #7c3aed;
+  stroke: var(--color-tunnel);
   stroke-width: 2;
   stroke-dasharray: 6 4;
   pointer-events: none;
@@ -96,14 +96,14 @@ function editPhase() {
 }
 .tunnel-label {
   font-size: 10px;
-  fill: #7c3aed;
+  fill: var(--color-tunnel);
   font-weight: 600;
   cursor: pointer;
   user-select: none;
 }
 .tunnel-phase {
   font-size: 9px;
-  fill: #7c3aed;
+  fill: var(--color-tunnel);
   font-style: italic;
   cursor: pointer;
   user-select: none;

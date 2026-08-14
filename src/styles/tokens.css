@@ -1,0 +1,92 @@
+/* Système de design : variables d'interface uniquement (fonds, bordures, texte,
+   accent). Les couleurs de contenu (icônes d'équipements, zones, VLAN) restent
+   codées en dur ailleurs — ce sont des données, pas du thème. */
+
+:root {
+  /* Couleurs — thème clair (par défaut) */
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-contrast: #ffffff;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+
+  /* Couleurs d'identité de fonctionnalité (canvas) : cohérentes toolbar ↔ canvas,
+     mais pas des couleurs de contenu — donc bien thémées elles aussi. */
+  --color-link: #64748b;
+  --color-tunnel: #7c3aed;
+  --color-site-bg: rgba(99, 102, 241, 0.08);
+  --color-site-border: #6366f1;
+
+  /* Espacements */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Rayons */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* Typo — pile système, pas de police distante (fonctionne hors-ligne) */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --text-xs: 10px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+}
+
+/* Suit le thème système tant qu'aucun choix explicite n'a été fait. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: #0f172a;
+    --color-surface: #1e293b;
+    --color-surface-2: #273449;
+    --color-border: #334155;
+    --color-border-strong: #475569;
+    --color-text: #e2e8f0;
+    --color-text-muted: #94a3b8;
+    --color-accent: #3b82f6;
+    --color-accent-hover: #60a5fa;
+    --color-accent-contrast: #0f172a;
+    --color-danger: #f87171;
+    --color-success: #4ade80;
+    --color-warning: #fbbf24;
+    --color-link: #94a3b8;
+    --color-tunnel: #a78bfa;
+    --color-site-bg: rgba(129, 140, 248, 0.15);
+    --color-site-border: #818cf8;
+  }
+}
+
+/* Choix explicite (bouton de bascule) : prime toujours sur le système. */
+:root[data-theme='dark'] {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-surface-2: #273449;
+  --color-border: #334155;
+  --color-border-strong: #475569;
+  --color-text: #e2e8f0;
+  --color-text-muted: #94a3b8;
+  --color-accent: #3b82f6;
+  --color-accent-hover: #60a5fa;
+  --color-accent-contrast: #0f172a;
+  --color-danger: #f87171;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-link: #94a3b8;
+  --color-tunnel: #a78bfa;
+  --color-site-bg: rgba(129, 140, 248, 0.15);
+  --color-site-border: #818cf8;
+}

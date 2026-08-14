@@ -42,7 +42,7 @@ const rackNodeHeight = computed(() => props.node.rackSpan * RACK_UNIT_HEIGHT - 2
 
 // Étiquettes IP sur le canvas : activables globalement, masquées en baie (pas la place).
 const ipLabels = computed(() =>
-  store.showIpLabels ? props.node.interfaces.map(formatInterface).filter(Boolean) : [],
+  store.showIpLabels || store.exportMode ? props.node.interfaces.map(formatInterface).filter(Boolean) : [],
 )
 const ipLabelStartY = computed(() => (isSelected.value ? 92 : 80))
 
@@ -156,8 +156,9 @@ function toSvgPoint(svg, event) {
       rx="8"
       class="node-highlight"
     />
+    <rect width="56" height="56" rx="10" class="node-card" />
     <component :is="iconComponent" v-if="iconComponent" />
-    <rect v-else width="56" height="56" rx="8" fill="#9ca3af" />
+    <rect v-else width="56" height="56" rx="8" fill="var(--color-text-muted)" />
     <text :x="NODE_SIZE / 2" y="68" text-anchor="middle" class="node-label">{{ node.label }}</text>
     <text v-if="isSelected" :x="NODE_SIZE / 2" y="80" text-anchor="middle" class="node-zone-label">
       {{ zoneName ? `zone : ${zoneName}` : 'aucune zone' }}
@@ -186,7 +187,7 @@ function toSvgPoint(svg, event) {
     <rect :width="RACK_WIDTH - 8" :height="rackNodeHeight" rx="3" class="rack-node-bg" />
     <g transform="translate(2,2) scale(0.286)">
       <component :is="iconComponent" v-if="iconComponent" />
-      <rect v-else width="56" height="56" rx="8" fill="#9ca3af" />
+      <rect v-else width="56" height="56" rx="8" fill="var(--color-text-muted)" />
     </g>
     <text :x="24" :y="rackNodeHeight / 2 + 4" class="rack-node-label">{{ node.label }}</text>
   </g>
@@ -196,44 +197,50 @@ function toSvgPoint(svg, event) {
 .network-node {
   cursor: grab;
 }
+.node-card {
+  fill: var(--color-surface);
+  stroke: var(--color-border);
+  stroke-width: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
+}
 .node-highlight {
   fill: none;
-  stroke: #2563eb;
+  stroke: var(--color-accent);
   stroke-width: 2;
   stroke-dasharray: 4 2;
 }
 .linking .node-highlight {
-  stroke: #f59e0b;
+  stroke: var(--color-warning);
 }
 .node-label {
   font-size: 11px;
-  fill: #374151;
+  fill: var(--color-text);
   user-select: none;
 }
 .node-zone-label {
   font-size: 10px;
   font-style: italic;
-  fill: #2563eb;
+  fill: var(--color-accent);
   user-select: none;
 }
 .node-ip-label {
   font-size: 9px;
-  fill: #059669;
-  font-family: monospace;
+  fill: var(--color-success);
+  font-family: var(--font-mono);
   user-select: none;
 }
 .rack-node-bg {
-  fill: #f9fafb;
-  stroke: #9ca3af;
+  fill: var(--color-surface);
+  stroke: var(--color-border-strong);
   stroke-width: 1;
 }
 .racked.selected .rack-node-bg {
-  stroke: #2563eb;
+  stroke: var(--color-accent);
   stroke-width: 2;
 }
 .rack-node-label {
   font-size: 10px;
-  fill: #374151;
+  fill: var(--color-text);
   user-select: none;
 }
 </style>

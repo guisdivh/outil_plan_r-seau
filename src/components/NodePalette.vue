@@ -44,33 +44,39 @@ function addNode(type) {
 <style scoped>
 .node-palette {
   width: 200px;
-  padding: 16px;
-  border-right: 1px solid #e5e7eb;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .node-palette h2 {
-  font-size: 14px;
+  font-size: var(--text-sm);
   text-transform: uppercase;
-  color: #6b7280;
-  margin: 0 0 8px;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
 }
 .palette-item {
-  padding: 8px 10px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  background: #fff;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 .palette-item:hover {
-  background: #f3f4f6;
+  background: var(--color-surface-2);
+  border-color: var(--color-border-strong);
 }
 .hint {
-  margin-top: 16px;
-  font-size: 12px;
-  color: #9ca3af;
+  margin-top: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
   line-height: 1.5;
 }
 </style>

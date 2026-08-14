@@ -103,13 +103,16 @@ function editUnits() {
 
 <style scoped>
 .rack-body {
-  fill: #f3f4f6;
-  stroke: #6b7280;
+  fill: var(--color-surface-2);
+  stroke: var(--color-border-strong);
   stroke-width: 2;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.1));
 }
 .selected .rack-body {
-  stroke: #2563eb;
+  stroke: var(--color-accent);
 }
+/* Bandeau volontairement sombre quel que soit le thème : évoque la façade
+   d'une vraie baie 19", une identité "matériel" plutôt qu'un élément de thème. */
 .rack-header {
   fill: #4b5563;
   cursor: grab;
@@ -127,12 +130,12 @@ function editUnits() {
   user-select: none;
 }
 .rack-unit-line {
-  stroke: #d1d5db;
+  stroke: var(--color-border);
   stroke-width: 1;
 }
 .rack-unit-label {
   font-size: 9px;
-  fill: #9ca3af;
+  fill: var(--color-text-muted);
   user-select: none;
 }
 </style>

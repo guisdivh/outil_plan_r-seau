@@ -47,8 +47,11 @@ export const usePlanStore = defineStore('plan', {
     linkMode: false,
     // mode « tunnel IPsec » : même principe que linkMode, mutuellement exclusif
     tunnelMode: false,
-    // Réglage d'affichage (pas une donnée du plan, non exporté/sauvegardé).
+    // Réglages d'affichage (pas des données du plan, non exportés/sauvegardés).
     showIpLabels: false,
+    // Actif brièvement pendant un export : force l'affichage exhaustif
+    // (IP, labels/VLAN des câbles, phase des tunnels) sur le rendu déjà à l'écran.
+    exportMode: false,
   }),
 
   getters: {
@@ -121,6 +124,10 @@ export const usePlanStore = defineStore('plan', {
 
     toggleIpLabels() {
       this.showIpLabels = !this.showIpLabels
+    },
+
+    setExportMode(value) {
+      this.exportMode = value
     },
 
     renameNode(id, label) {
