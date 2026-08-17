@@ -81,14 +81,30 @@ export const usePlanStore = defineStore('plan', {
     selectedNodeIds: (state) =>
       state.nodes.filter((n) => state.selectedIds.includes(n.id)).map((n) => n.id),
     // Nœuds visibles sur le canvas : masque ceux dont le site ou la baie est replié.
+    // Une baie repliée indirectement (son site est replié, même si elle ne
+    // l'est pas elle-même) masque aussi les nœuds montés dedans — un nœud en
+    // baie n'a pas son propre siteId, seule sa baie porte le rattachement.
     visibleNodes: (state) => {
       const collapsedSiteIds = new Set(state.sites.filter((s) => s.collapsed).map((s) => s.id))
-      const collapsedRackIds = new Set(state.racks.filter((r) => r.collapsed).map((r) => r.id))
+      const collapsedRackIds = new Set(
+        state.racks.filter((r) => r.collapsed || (r.siteId && collapsedSiteIds.has(r.siteId))).map((r) => r.id),
+      )
       return state.nodes.filter(
         (n) =>
           (!n.siteId || !collapsedSiteIds.has(n.siteId)) &&
           (!n.rackId || !collapsedRackIds.has(n.rackId)),
       )
+    },
+    // Zones/baies visibles : même principe que visibleNodes — masquées si leur
+    // site est replié (une baie n'a pas de « site » au sens d'un nœud, mais
+    // elle a bien un siteId, donc la même règle s'applique).
+    visibleZones: (state) => {
+      const collapsedSiteIds = new Set(state.sites.filter((s) => s.collapsed).map((s) => s.id))
+      return state.zones.filter((z) => !z.siteId || !collapsedSiteIds.has(z.siteId))
+    },
+    visibleRacks: (state) => {
+      const collapsedSiteIds = new Set(state.sites.filter((s) => s.collapsed).map((s) => s.id))
+      return state.racks.filter((r) => !r.siteId || !collapsedSiteIds.has(r.siteId))
     },
     // Bus dont il reste au moins 2 câbles membres (sinon rien à simplifier
     // visuellement) : c'est ce filtre, pas state.buses brut, qui doit être
@@ -300,6 +316,22 @@ export const usePlanStore = defineStore('plan', {
         if (idSet.has(node.id)) {
           node.x += dx
           node.y += dy
+        }
+      }
+      this.recomputeZoneAssignments()
+    },
+
+    // Applique une position propre à chaque nœud (contrairement à moveNodesBy,
+    // qui applique le même delta à tous) — utilisé par l'alignement/la
+    // distribution. Ne touche jamais siteId (comme moveNodesBy) ; zoneId est
+    // recalculé selon la nouvelle position, exactement comme un glisser-déposer.
+    setNodePositions(updates) {
+      const byId = new Map(updates.map((u) => [u.id, u]))
+      for (const node of this.nodes) {
+        const u = byId.get(node.id)
+        if (u) {
+          node.x = u.x
+          node.y = u.y
         }
       }
       this.recomputeZoneAssignments()

@@ -33,5 +33,7 @@ Voir [`prompts/`](./prompts) — chaque fichier est une étape à donner à l'as
 25. [Ports de branchement sur les câbles](./prompts/25-link-ports.md) — sourcePort/targetPort, édition dans le panneau de propriétés. ✅
 26. [Exports enrichis : CSV branchements + encart PNG](./prompts/26-cabling-export.md) — table de câblage, légende VLAN et récap port↔VLAN à l'export. ✅
 27. [Regroupement visuel des câbles en bus](./prompts/27-bus-grouping.md) — tronc commun + dérivations, réversible, sans toucher aux liens sous-jacents. ✅
+28. [Alignement et distribution d'une sélection](./prompts/28-align-distribute.md) — aligner/centrer/distribuer plusieurs nœuds sélectionnés. ✅
+29. [Bug — Zones/baies pas solidaires d'un site replié](./prompts/29-site-zone-rack-collapse-bug.md) — masquage manquant au repli, pas de bug au déplacement. ✅
 
 Le code du projet Vue est scaffoldé à la racine de ce dossier (étape 1).

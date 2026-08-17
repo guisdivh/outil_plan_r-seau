@@ -11,7 +11,12 @@ const props = defineProps({
 const store = usePlanStore()
 const isSelected = computed(() => store.selectedIds.includes(props.site.id))
 const size = computed(() => siteDisplaySize(props.site))
-const memberCount = computed(() => store.nodes.filter((n) => n.siteId === props.site.id).length)
+// Compte les équipements rattachés directement, plus ceux montés dans une
+// baie rattachée au site (un nœud en baie n'a pas de siteId propre).
+const memberCount = computed(() => {
+  const rackIds = new Set(store.racks.filter((r) => r.siteId === props.site.id).map((r) => r.id))
+  return store.nodes.filter((n) => n.siteId === props.site.id || (n.rackId && rackIds.has(n.rackId))).length
+})
 
 function toSvgPoint(svg, event) {
   return screenToCanvas(event.clientX, event.clientY, svg, { x: store.viewPanX, y: store.viewPanY }, store.viewZoom)

@@ -4,6 +4,16 @@ import { usePlanStore } from '../stores/plan'
 import { EQUIPMENT_TYPES } from '../constants/equipmentTypes'
 import { INTERFACE_ROLES } from '../utils/interfaces'
 import { canExposePorts, parseWhitelist, formatWhitelist } from '../utils/exposedPorts'
+import {
+  alignLeft,
+  alignRight,
+  alignTop,
+  alignBottom,
+  centerHorizontal,
+  centerVertical,
+  distributeHorizontal,
+  distributeVertical,
+} from '../utils/align'
 
 const store = usePlanStore()
 const nameDraft = ref('')
@@ -44,6 +54,15 @@ function groupBus() {
 }
 function ungroupBus() {
   if (selectedBusId.value) store.ungroupBus(selectedBusId.value)
+}
+
+// Exclut les nœuds montés en baie : leur position vient du rack (syncRackNodePositions),
+// pas d'eux — ni déplacés, ni comptés dans le calcul des bords de la sélection.
+const alignableNodes = computed(() => selectedNodes.value.filter((n) => !n.rackId))
+const rackedExcludedCount = computed(() => selectedNodes.value.length - alignableNodes.value.length)
+
+function align(fn) {
+  if (alignableNodes.value.length >= 2) store.setNodePositions(fn(alignableNodes.value))
 }
 
 watch(
@@ -273,6 +292,29 @@ function onWhitelistChange(ruleId, event) {
         </select>
       </label>
       <p class="multi-hint">Le nom ne peut être édité qu'en sélection simple.</p>
+
+      <div v-if="alignableNodes.length >= 2" class="align-block">
+        <div class="interfaces-header"><span>Alignement</span></div>
+        <div class="align-grid">
+          <button type="button" class="action-button" title="Aligner à gauche" @click="align(alignLeft)">Gauche</button>
+          <button type="button" class="action-button" title="Centrer horizontalement" @click="align(centerHorizontal)">Centre H</button>
+          <button type="button" class="action-button" title="Aligner à droite" @click="align(alignRight)">Droite</button>
+          <button type="button" class="action-button" title="Aligner en haut" @click="align(alignTop)">Haut</button>
+          <button type="button" class="action-button" title="Centrer verticalement" @click="align(centerVertical)">Centre V</button>
+          <button type="button" class="action-button" title="Aligner en bas" @click="align(alignBottom)">Bas</button>
+        </div>
+        <div v-if="alignableNodes.length >= 3" class="align-grid two-cols">
+          <button type="button" class="action-button" title="Distribuer horizontalement" @click="align(distributeHorizontal)">
+            Distribuer H
+          </button>
+          <button type="button" class="action-button" title="Distribuer verticalement" @click="align(distributeVertical)">
+            Distribuer V
+          </button>
+        </div>
+        <p v-if="rackedExcludedCount" class="multi-hint">
+          {{ rackedExcludedCount }} équipement(s) en baie exclu(s) (position fixée par la baie).
+        </p>
+      </div>
     </template>
   </aside>
 </template>
@@ -331,6 +373,26 @@ function onWhitelistChange(ruleId, event) {
 }
 .action-button:hover {
   background: var(--color-surface-2);
+}
+.align-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+.align-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-1);
+}
+.align-grid.two-cols {
+  grid-template-columns: repeat(2, 1fr);
+}
+.align-grid .action-button {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  text-align: center;
 }
 .interfaces {
   display: flex;

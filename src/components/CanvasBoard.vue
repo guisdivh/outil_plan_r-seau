@@ -110,15 +110,17 @@ function onMarqueeUp(event) {
     const x2 = box.x + box.width
     const y2 = box.y + box.height
 
-    const nodeIds = store.nodes
+    // Un élément masqué (site/baie replié) ne doit pas être sélectionnable en
+    // dessinant un rectangle par-dessus l'endroit où il serait — d'où visibleNodes/visibleZones/visibleRacks.
+    const nodeIds = store.visibleNodes
       .filter((n) => n.x >= box.x && n.x <= x2 && n.y >= box.y && n.y <= y2)
       .map((n) => n.id)
     // Une zone n'est retenue que si elle est entièrement dans le rectangle,
     // pour ne pas la sélectionner accidentellement en englobant son contenu.
-    const zoneIds = store.zones
+    const zoneIds = store.visibleZones
       .filter((z) => z.x >= box.x && z.x + z.width <= x2 && z.y >= box.y && z.y + z.height <= y2)
       .map((z) => z.id)
-    const rackIds = store.racks
+    const rackIds = store.visibleRacks
       .filter((r) => {
         const b = rackBounds(r)
         return b.x1 >= box.x && b.x2 <= x2 && b.y1 >= box.y && b.y2 <= y2
@@ -222,8 +224,8 @@ onUnmounted(() => {
         <rect x="-20000" y="-20000" width="40000" height="40000" fill="url(#canvas-grid)" />
 
         <SiteFrame v-for="site in store.sites" :key="site.id" :site="site" />
-        <ZoneRect v-for="zone in store.zones" :key="zone.id" :zone="zone" />
-        <RackFrame v-for="rack in store.racks" :key="rack.id" :rack="rack" />
+        <ZoneRect v-for="zone in store.visibleZones" :key="zone.id" :zone="zone" />
+        <RackFrame v-for="rack in store.visibleRacks" :key="rack.id" :rack="rack" />
         <NetworkLink v-for="link in store.ungroupedLinks" :key="link.id" :link="link" />
         <BusGroup v-for="bus in store.visibleBuses" :key="bus.id" :bus="bus" />
         <TunnelLink v-for="tunnel in store.tunnels" :key="tunnel.id" :tunnel="tunnel" />
