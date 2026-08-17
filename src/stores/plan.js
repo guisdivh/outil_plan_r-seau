@@ -10,6 +10,8 @@ import { resolveEffectiveNodes } from '../utils/nodeVisibility'
 import { computePlanBounds } from '../utils/planBounds'
 import { MIN_ZOOM, MAX_ZOOM } from '../utils/viewport'
 import { canBeTunnelEndpoint } from '../constants/equipmentTypes'
+import { sidePanelFootprint } from '../utils/exportSidePanel'
+import { visibleBusesOf, computeBusRoutes } from '../utils/busRouting'
 
 const STORAGE_KEY = 'outil-plan-reseau:plan'
 
@@ -17,6 +19,14 @@ let idCounter = 0
 function nextId(prefix) {
   idCounter += 1
   return `${prefix}-${idCounter}`
+}
+
+// Tolère des coordonnées fournies en chaîne ("120") ; rejette tout le reste
+// (undefined, texte non numérique...) plutôt que de laisser passer un NaN qui
+// rendrait l'élément invisible sur le canvas sans aucune erreur visible.
+function toFiniteNumber(v) {
+  const n = typeof v === 'string' ? Number(v) : v
+  return typeof n === 'number' && Number.isFinite(n) ? n : undefined
 }
 
 // Après un import, on repart d'un compteur au-dessus du plus grand id chargé
@@ -41,6 +51,10 @@ export const usePlanStore = defineStore('plan', {
     vlans: [],
     sites: [],
     tunnels: [],
+    // Regroupement visuel de câbles convergeant vers un même équipement (le
+    // hub) en un tronc commun + dérivations — voir prompt 27. Les câbles
+    // eux-mêmes ne sont jamais modifiés au-delà de leur champ busId.
+    buses: [],
     selectedIds: [],
     // id du nœud depuis lequel on est en train de tirer un câble/tunnel, ou null
     linkingFromId: null,
@@ -76,10 +90,28 @@ export const usePlanStore = defineStore('plan', {
           (!n.rackId || !collapsedRackIds.has(n.rackId)),
       )
     },
-    // Points à tracer pour chaque câble (voir utils/linkRouting.js) : un nœud dont le
-    // site/la baie est replié est ancré au centre du bloc replié plutôt qu'à sa position réelle.
-    linkRoutes: (state) =>
-      computeLinkRoutes(state.links, resolveEffectiveNodes(state.nodes, state.sites, state.racks)),
+    // Bus dont il reste au moins 2 câbles membres (sinon rien à simplifier
+    // visuellement) : c'est ce filtre, pas state.buses brut, qui doit être
+    // utilisé partout où « quels bus sont affichés » importe.
+    visibleBuses: (state) => visibleBusesOf(state.buses, state.links),
+    // Câbles rendus individuellement : tous sauf ceux dont le bus est actuellement affiché
+    // (ceux-là sont rendus une fois par bus, en tronc + dérivations — voir busRoutes).
+    ungroupedLinks: (state) => {
+      const visibleIds = new Set(visibleBusesOf(state.buses, state.links).map((b) => b.id))
+      return state.links.filter((l) => !l.busId || !visibleIds.has(l.busId))
+    },
+    // Points à tracer pour chaque câble non groupé (voir utils/linkRouting.js) : un nœud dont
+    // le site/la baie est replié est ancré au centre du bloc replié plutôt qu'à sa position réelle.
+    linkRoutes: (state) => {
+      const visibleIds = new Set(visibleBusesOf(state.buses, state.links).map((b) => b.id))
+      const ungrouped = state.links.filter((l) => !l.busId || !visibleIds.has(l.busId))
+      return computeLinkRoutes(ungrouped, resolveEffectiveNodes(state.nodes, state.sites, state.racks))
+    },
+    // Tronc + dérivations de chaque bus affiché (voir utils/busRouting.js).
+    busRoutes: (state) => {
+      const visible = visibleBusesOf(state.buses, state.links)
+      return computeBusRoutes(visible, state.links, resolveEffectiveNodes(state.nodes, state.sites, state.racks))
+    },
     // Extrémités (déjà résolues) de chaque tunnel : trait direct, pas de routage orthogonal.
     tunnelEndpoints: (state) => {
       const resolved = resolveEffectiveNodes(state.nodes, state.sites, state.racks)
@@ -227,15 +259,19 @@ export const usePlanStore = defineStore('plan', {
 
     // Cadre le plan entier à l'échelle 1:1 pour l'export (pas la fenêtre actuelle).
     // Retourne la taille exacte de contenu à utiliser pour dimensionner le SVG exporté.
+    // Réserve aussi la place du panneau latéral (légende VLAN + branchements,
+    // voir ExportSidePanel.vue) : sans ça, il serait purement et simplement
+    // rogné hors du cadre de l'image exportée.
     setViewForExport() {
       const bounds = computePlanBounds(this.nodes, this.zones, this.racks, this.sites, this.links)
       const margin = 40
+      const panel = sidePanelFootprint(this.vlans.length, this.links.length)
       this.viewZoom = 1
       this.viewPanX = margin - bounds.minX
       this.viewPanY = margin - bounds.minY
       return {
-        width: bounds.maxX - bounds.minX + margin * 2,
-        height: bounds.maxY - bounds.minY + margin * 2,
+        width: bounds.maxX - bounds.minX + margin * 2 + panel.width,
+        height: Math.max(bounds.maxY - bounds.minY, panel.height) + margin * 2,
       }
     },
 
@@ -352,7 +388,17 @@ export const usePlanStore = defineStore('plan', {
           (l.sourceId === targetId && l.targetId === sourceId),
       )
       if (alreadyLinked) return
-      this.links.push({ id: nextId('link'), sourceId, targetId, label: '', vlanId: null, waypoints: [] })
+      this.links.push({
+        id: nextId('link'),
+        sourceId,
+        targetId,
+        label: '',
+        vlanId: null,
+        waypoints: [],
+        sourcePort: '',
+        targetPort: '',
+        busId: null,
+      })
     },
 
     renameTunnel(id, name) {
@@ -373,6 +419,44 @@ export const usePlanStore = defineStore('plan', {
     setLinkVlan(id, vlanId) {
       const link = this.links.find((l) => l.id === id)
       if (link) link.vlanId = vlanId
+    },
+
+    // Port physique de branchement (texte libre, ex. "GE0/1") — distinct des
+    // interfaces IP et des règles de ports exposés, qui vivent sur le nœud.
+    setLinkSourcePort(id, port) {
+      const link = this.links.find((l) => l.id === id)
+      if (link) link.sourcePort = port
+    },
+
+    setLinkTargetPort(id, port) {
+      const link = this.links.find((l) => l.id === id)
+      if (link) link.targetPort = port
+    },
+
+    // Regroupe les câbles actuellement sélectionnés (et uniquement eux) en un
+    // bus, à condition qu'ils partagent un nœud commun (le hub du tronc) et
+    // qu'il y en ait au moins 2 — un bus à un seul membre n'a rien à simplifier.
+    // Purement additif : ne touche à aucun champ des câbles hormis busId.
+    groupSelectedLinksIntoBus() {
+      const ids = this.selectedIds
+      const links = this.links.filter((l) => ids.includes(l.id))
+      if (links.length < 2 || links.length !== ids.length) return false
+
+      const endpointSets = links.map((l) => new Set([l.sourceId, l.targetId]))
+      const hubId = [...endpointSets[0]].find((id) => endpointSets.every((set) => set.has(id)))
+      if (!hubId) return false
+
+      const bus = { id: nextId('bus'), hubId }
+      this.buses.push(bus)
+      for (const link of links) link.busId = bus.id
+      return true
+    },
+
+    // Dissout un bus : les câbles redeviennent des liens rendus individuellement,
+    // sans qu'aucune de leurs autres données n'ait jamais changé.
+    ungroupBus(busId) {
+      for (const link of this.links) if (link.busId === busId) link.busId = null
+      this.buses = this.buses.filter((b) => b.id !== busId)
     },
 
     // Insère un waypoint au bon endroit du tracé (segment le plus proche de x,y).
@@ -729,6 +813,9 @@ export const usePlanStore = defineStore('plan', {
           rack.siteId = null
         }
       }
+      // Un bus tombé sous 2 câbles membres (câble ou équipement supprimé) n'a
+      // plus rien à simplifier visuellement : il est dissous silencieusement.
+      this.buses = this.buses.filter((b) => this.links.filter((l) => l.busId === b.id).length >= 2)
       this.selectedIds = []
       this.recomputeZoneAssignments()
     },
@@ -814,36 +901,88 @@ export const usePlanStore = defineStore('plan', {
           vlans: this.vlans,
           sites: this.sites,
           tunnels: this.tunnels,
+          buses: this.buses,
         },
         null,
         2,
       )
     },
 
+    // Retourne un rapport { droppedNodes, droppedRacks, droppedZones, droppedSites }
+    // (libellés des éléments ignorés) pour que l'appelant puisse prévenir
+    // l'utilisateur : un import qui perd silencieusement des éléments est pire
+    // qu'un import qui échoue bruyamment.
     loadFromData(data) {
-      this.racks = Array.isArray(data.racks)
-        ? data.racks.map((r) => ({ siteId: null, collapsed: false, ...r }))
-        : []
+      const dropped = { droppedNodes: [], droppedRacks: [], droppedZones: [], droppedSites: [] }
+
+      this.racks = (Array.isArray(data.racks) ? data.racks : []).reduce((acc, r) => {
+        const x = toFiniteNumber(r.x)
+        const y = toFiniteNumber(r.y)
+        if (x === undefined || y === undefined) {
+          dropped.droppedRacks.push(r.name || r.id || '?')
+          return acc
+        }
+        acc.push({ siteId: null, collapsed: false, ...r, x, y })
+        return acc
+      }, [])
+
       this.vlans = Array.isArray(data.vlans) ? data.vlans : []
-      this.sites = Array.isArray(data.sites) ? data.sites.map((s) => ({ collapsed: false, ...s })) : []
+
+      this.sites = (Array.isArray(data.sites) ? data.sites : []).reduce((acc, s) => {
+        const x = toFiniteNumber(s.x)
+        const y = toFiniteNumber(s.y)
+        const width = toFiniteNumber(s.width)
+        const height = toFiniteNumber(s.height)
+        if ([x, y, width, height].some((v) => v === undefined)) {
+          dropped.droppedSites.push(s.name || s.id || '?')
+          return acc
+        }
+        acc.push({ collapsed: false, ...s, x, y, width, height })
+        return acc
+      }, [])
+
       this.tunnels = Array.isArray(data.tunnels) ? data.tunnels.map((t) => ({ phase: '', ...t })) : []
-      this.nodes = Array.isArray(data.nodes)
-        ? data.nodes.map((n) => ({
-            rackId: null,
-            rackUnit: null,
-            rackSpan: rackSpanByType(n.type),
-            interfaces: [],
-            siteId: null,
-            exposedPorts: [],
-            ...n,
-          }))
-        : []
+
+      this.nodes = (Array.isArray(data.nodes) ? data.nodes : []).reduce((acc, n) => {
+        const x = toFiniteNumber(n.x)
+        const y = toFiniteNumber(n.y)
+        if (x === undefined || y === undefined) {
+          dropped.droppedNodes.push(n.label || n.id || '?')
+          return acc
+        }
+        acc.push({
+          rackId: null,
+          rackUnit: null,
+          rackSpan: rackSpanByType(n.type),
+          interfaces: [],
+          siteId: null,
+          exposedPorts: [],
+          zoneId: null,
+          ...n,
+          x,
+          y,
+        })
+        return acc
+      }, [])
+
       this.links = Array.isArray(data.links)
-        ? data.links.map((l) => ({ vlanId: null, waypoints: [], ...l }))
+        ? data.links.map((l) => ({ vlanId: null, waypoints: [], sourcePort: '', targetPort: '', busId: null, ...l }))
         : []
-      this.zones = Array.isArray(data.zones)
-        ? data.zones.map((z) => ({ subnet: '', siteId: null, ...z }))
-        : []
+      this.buses = Array.isArray(data.buses) ? data.buses : []
+
+      this.zones = (Array.isArray(data.zones) ? data.zones : []).reduce((acc, z) => {
+        const x = toFiniteNumber(z.x)
+        const y = toFiniteNumber(z.y)
+        const width = toFiniteNumber(z.width)
+        const height = toFiniteNumber(z.height)
+        if ([x, y, width, height].some((v) => v === undefined)) {
+          dropped.droppedZones.push(z.name || z.id || '?')
+          return acc
+        }
+        acc.push({ subnet: '', siteId: null, ...z, x, y, width, height })
+        return acc
+      }, [])
+
       this.selectedIds = []
       this.linkingFromId = null
 
@@ -854,6 +993,16 @@ export const usePlanStore = defineStore('plan', {
       for (const zone of this.zones) if (zone.siteId && !siteIds.has(zone.siteId)) zone.siteId = null
       for (const rack of this.racks) if (rack.siteId && !siteIds.has(rack.siteId)) rack.siteId = null
 
+      // Anti-orphelin (bus) : un hub absent, ou un bus tombé sous 2 câbles
+      // membres (fichier édité à la main), ne doit pas laisser de busId
+      // pointant dans le vide.
+      const nodeIds = new Set(this.nodes.map((n) => n.id))
+      this.buses = this.buses.filter(
+        (b) => nodeIds.has(b.hubId) && this.links.filter((l) => l.busId === b.id).length >= 2,
+      )
+      const busIds = new Set(this.buses.map((b) => b.id))
+      for (const link of this.links) if (link.busId && !busIds.has(link.busId)) link.busId = null
+
       bumpIdCounterFrom([
         this.nodes,
         this.links,
@@ -862,9 +1011,12 @@ export const usePlanStore = defineStore('plan', {
         this.vlans,
         this.sites,
         this.tunnels,
+        this.buses,
         this.nodes.flatMap((n) => n.interfaces),
         this.nodes.flatMap((n) => n.exposedPorts),
       ])
+
+      return dropped
     },
 
     saveToLocalStorage() {

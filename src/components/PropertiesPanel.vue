@@ -11,6 +11,41 @@ const nameDraft = ref('')
 const selectedNodes = computed(() => store.selectedNodes)
 const singleNode = computed(() => (selectedNodes.value.length === 1 ? selectedNodes.value[0] : null))
 
+// Un seul câble sélectionné (et rien d'autre) : édition des ports de
+// branchement. Distinct des interfaces IP et des ports exposés (sur le nœud).
+const selectedLink = computed(() => {
+  if (store.selectedIds.length !== 1) return null
+  return store.links.find((l) => l.id === store.selectedIds[0]) ?? null
+})
+const linkSourceLabel = computed(
+  () => store.nodes.find((n) => n.id === selectedLink.value?.sourceId)?.label ?? '?',
+)
+const linkTargetLabel = computed(
+  () => store.nodes.find((n) => n.id === selectedLink.value?.targetId)?.label ?? '?',
+)
+
+// Plusieurs câbles (et uniquement des câbles) sélectionnés : proposer de les
+// grouper en bus, ou de dégrouper si c'est déjà un bus complet.
+const selectedLinks = computed(() => {
+  if (store.selectedIds.length < 2) return []
+  const links = store.links.filter((l) => store.selectedIds.includes(l.id))
+  return links.length === store.selectedIds.length ? links : []
+})
+const selectedBusId = computed(() => {
+  if (!selectedLinks.value.length) return null
+  const busId = selectedLinks.value[0].busId
+  if (!busId) return null
+  return selectedLinks.value.every((l) => l.busId === busId) ? busId : null
+})
+function groupBus() {
+  if (!store.groupSelectedLinksIntoBus()) {
+    window.alert('Ces câbles ne partagent pas un équipement commun : regroupement en bus impossible.')
+  }
+}
+function ungroupBus() {
+  if (selectedBusId.value) store.ungroupBus(selectedBusId.value)
+}
+
 watch(
   singleNode,
   (node) => {
@@ -54,10 +89,57 @@ function onWhitelistChange(ruleId, event) {
 </script>
 
 <template>
-  <aside v-if="selectedNodes.length" class="properties-panel">
+  <aside v-if="selectedNodes.length || selectedLink || selectedLinks.length" class="properties-panel">
     <h2>Propriétés</h2>
 
-    <template v-if="singleNode">
+    <template v-if="selectedLink">
+      <p class="info-line">Câble : {{ linkSourceLabel }} → {{ linkTargetLabel }}</p>
+      <label class="field">
+        <span>Nom</span>
+        <input
+          type="text"
+          :value="selectedLink.label"
+          @change="store.renameLink(selectedLink.id, $event.target.value)"
+        />
+      </label>
+      <label class="field">
+        <span>VLAN</span>
+        <select
+          :value="selectedLink.vlanId ?? ''"
+          @change="store.setLinkVlan(selectedLink.id, $event.target.value || null)"
+        >
+          <option value="">Sans VLAN</option>
+          <option v-for="v in store.vlans" :key="v.id" :value="v.id">{{ v.number }} · {{ v.name }}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Port source ({{ linkSourceLabel }})</span>
+        <input
+          type="text"
+          :value="selectedLink.sourcePort"
+          placeholder="ex : GE0/1"
+          @change="store.setLinkSourcePort(selectedLink.id, $event.target.value)"
+        />
+      </label>
+      <label class="field">
+        <span>Port cible ({{ linkTargetLabel }})</span>
+        <input
+          type="text"
+          :value="selectedLink.targetPort"
+          placeholder="ex : port 12"
+          @change="store.setLinkTargetPort(selectedLink.id, $event.target.value)"
+        />
+      </label>
+      <p v-if="selectedLink.busId" class="info-line">Fait partie d'un bus.</p>
+    </template>
+
+    <template v-else-if="selectedLinks.length">
+      <p class="multi-hint">{{ selectedLinks.length }} câbles sélectionnés.</p>
+      <button v-if="selectedBusId" type="button" class="action-button" @click="ungroupBus">Dégrouper le bus</button>
+      <button v-else type="button" class="action-button" @click="groupBus">Grouper en bus</button>
+    </template>
+
+    <template v-else-if="singleNode">
       <label class="field">
         <span>Nom</span>
         <input v-model="nameDraft" type="text" @change="commitName" />
@@ -237,6 +319,18 @@ function onWhitelistChange(ruleId, event) {
   margin: 0;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+.action-button {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.action-button:hover {
+  background: var(--color-surface-2);
 }
 .interfaces {
   display: flex;

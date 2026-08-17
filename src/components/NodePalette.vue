@@ -68,12 +68,15 @@ function addNode(type) {
         Clic : sélectionner / déplacer.<br />
         Ctrl/Cmd+clic : ajouter à la sélection.<br />
         Drag dans le vide : sélection par rectangle.<br />
+        Déplacer la vue (pan) : barre espace + glisser, ou clic molette + glisser, ou clic droit + glisser.<br />
+        Molette seule : zoomer/dézoomer (centré sur le curseur). Touche 0 : recadrer sur tout le plan.<br />
         « Mode relier » (barre d'outils) : clic sur 2 nœuds pour les relier.<br />
         Raccourci : Alt+clic fait pareil sans activer le mode.<br />
         Glisser un équipement sur une baie : le monte sur la première U libre.<br />
         Double-clic sur une baie : renommer ; sur son « X U » : changer la taille ; « ▾ » : replier.<br />
         Clic sur un câble : sélectionner (double-clic sur l'étiquette : renommer).<br />
         Double-clic sur un câble : ajouter un point de passage ; glisser/double-clic dessus : déplacer/retirer.<br />
+        Ctrl/Cmd+clic sur plusieurs câbles reliés au même équipement : « Grouper en bus » (panneau de propriétés) pour un tronc commun + dérivations. Clic sur le tronc : sélectionne tout le groupe (bouton Dégrouper) ; clic sur une dérivation : sélectionne ce câble.<br />
         Glisser un équipement sur un site : le rattache (position libre).<br />
         « Tunnel IPsec » (barre d'outils) : clic sur 2 passerelles (routeur ou firewall uniquement) pour créer un tunnel.<br />
         Double-clic sur un site : renommer ; « replier » : masque son contenu.<br />

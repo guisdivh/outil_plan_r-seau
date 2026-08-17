@@ -3,6 +3,7 @@ import { nextTick, ref } from 'vue'
 import { usePlanStore } from '../stores/plan'
 import { downloadText } from '../utils/download'
 import { exportSvg, exportPng } from '../utils/export'
+import { exportCablingCsv } from '../utils/csv'
 import { parseImportItems } from '../utils/importData'
 import VlanPanel from './VlanPanel.vue'
 import { applyTheme, effectiveTheme } from '../utils/theme'
@@ -37,6 +38,10 @@ function exportJson() {
   downloadText(store.toJSON(), 'plan-reseau.json', 'application/json')
 }
 
+function onExportCablingCsv() {
+  exportCablingCsv(store.links, store.nodes, store.vlans, 'branchements.csv')
+}
+
 function triggerImport() {
   fileInput.value?.click()
 }
@@ -45,7 +50,18 @@ async function onFileChange(event) {
   const file = event.target.files[0]
   if (!file) return
   try {
-    store.loadFromData(JSON.parse(await file.text()))
+    const dropped = store.loadFromData(JSON.parse(await file.text()))
+    const messages = [
+      dropped.droppedNodes.length && `${dropped.droppedNodes.length} nœud(s) : ${dropped.droppedNodes.slice(0, 10).join(', ')}`,
+      dropped.droppedRacks.length && `${dropped.droppedRacks.length} baie(s) : ${dropped.droppedRacks.slice(0, 10).join(', ')}`,
+      dropped.droppedZones.length && `${dropped.droppedZones.length} zone(s) : ${dropped.droppedZones.slice(0, 10).join(', ')}`,
+      dropped.droppedSites.length && `${dropped.droppedSites.length} site(s) : ${dropped.droppedSites.slice(0, 10).join(', ')}`,
+    ].filter(Boolean)
+    if (messages.length) {
+      window.alert(
+        `Import partiel : coordonnées (x/y/width/height) manquantes ou non numériques, éléments ignorés :\n${messages.join('\n')}`,
+      )
+    }
   } catch {
     window.alert('Fichier JSON invalide.')
   }
@@ -158,6 +174,13 @@ function onExportPng() {
       <input ref="fileInput" type="file" accept="application/json" class="hidden-input" @change="onFileChange" />
       <button type="button" @click="onExportPng">Exporter PNG</button>
       <button type="button" @click="onExportSvg">Exporter SVG</button>
+      <button
+        type="button"
+        title="Table de câblage : équipement/port source et cible, VLAN, label — une ligne par câble."
+        @click="onExportCablingCsv"
+      >
+        Exporter CSV branchements
+      </button>
       <button
         type="button"
         title="CSV: colonnes id,type,label,links (links séparés par |). JSON: tableau [{id, type, label, links}]."

@@ -7,7 +7,8 @@ import ZoneRect from './ZoneRect.vue'
 import RackFrame from './RackFrame.vue'
 import SiteFrame from './SiteFrame.vue'
 import TunnelLink from './TunnelLink.vue'
-import ExportLegend from './ExportLegend.vue'
+import BusGroup from './BusGroup.vue'
+import ExportSidePanel from './ExportSidePanel.vue'
 import FirewallRulesExport from './FirewallRulesExport.vue'
 import ZoomControls from './ZoomControls.vue'
 import { rackBounds } from '../utils/rackLayout'
@@ -39,9 +40,10 @@ let didDrag = false
 const DRAG_THRESHOLD = 4
 
 function onSvgPointerDown(event) {
-  // Pan : clic molette, ou barre espace maintenue + clic gauche. Prioritaire sur
-  // tout le reste (ne doit jamais démarrer un tracé de câble ni une sélection).
-  if (event.button === 1 || (event.button === 0 && spacePressed.value)) {
+  // Pan : clic molette, clic droit, ou barre espace maintenue + clic gauche
+  // (convention Figma/draw.io). Prioritaire sur tout le reste (ne doit jamais
+  // démarrer un tracé de câble ni une sélection).
+  if (event.button === 1 || event.button === 2 || (event.button === 0 && spacePressed.value)) {
     event.preventDefault()
     isPanning.value = true
     panStart = { x: event.clientX, y: event.clientY, panX: store.viewPanX, panY: store.viewPanY }
@@ -49,6 +51,9 @@ function onSvgPointerDown(event) {
     window.addEventListener('pointerup', onPanUp)
     return
   }
+  // Seul le clic gauche démarre une sélection par rectangle (pas de bouton
+  // « précédent »/« suivant » de souris égaré sur le fond vide).
+  if (event.button !== 0) return
 
   if (store.linkingFromId) {
     // Clic dans le vide pendant un câble en cours de tracé : annule (le mode reste actif).
@@ -203,6 +208,7 @@ onUnmounted(() => {
       @pointerdown="onSvgPointerDown"
       @pointermove="onPointerMove"
       @wheel.prevent="onWheel"
+      @contextmenu.prevent
     >
       <defs>
         <pattern id="canvas-grid" width="24" height="24" patternUnits="userSpaceOnUse">
@@ -218,11 +224,12 @@ onUnmounted(() => {
         <SiteFrame v-for="site in store.sites" :key="site.id" :site="site" />
         <ZoneRect v-for="zone in store.zones" :key="zone.id" :zone="zone" />
         <RackFrame v-for="rack in store.racks" :key="rack.id" :rack="rack" />
-        <NetworkLink v-for="link in store.links" :key="link.id" :link="link" />
+        <NetworkLink v-for="link in store.ungroupedLinks" :key="link.id" :link="link" />
+        <BusGroup v-for="bus in store.visibleBuses" :key="bus.id" :bus="bus" />
         <TunnelLink v-for="tunnel in store.tunnels" :key="tunnel.id" :tunnel="tunnel" />
         <NetworkNode v-for="node in store.visibleNodes" :key="node.id" :node="node" />
         <FirewallRulesExport v-for="node in exportRuleNodes" :key="node.id" :node="node" />
-        <ExportLegend v-if="store.exportMode" />
+        <ExportSidePanel v-if="store.exportMode" />
 
         <line
           v-if="linkSourceNode"
@@ -263,6 +270,10 @@ onUnmounted(() => {
 }
 svg {
   display: block;
+  /* Le SVG exporté est un document autonome, sans <body> pour lui transmettre
+     la police via main.css : sans ceci, tout texte retombe sur le serif par
+     défaut du navigateur (notes de ports, libellés...) une fois hors de la page. */
+  font-family: var(--font-sans);
 }
 .canvas-bg {
   fill: var(--color-bg);

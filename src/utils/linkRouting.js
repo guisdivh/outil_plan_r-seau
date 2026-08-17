@@ -2,12 +2,29 @@
 // plusieurs câbles ne partent pas tous du même pixel.
 const PORT_SPACING = 10
 
-// Petit décalage déterministe (dérivé de l'id du câble) sur le coude du tracé,
-// pour désempiler deux routes auto qui tomberaient sinon sur la même ligne.
-function laneOffset(id) {
+// Petit décalage déterministe (dérivé d'un id) sur le coude du tracé, pour
+// désempiler deux routes auto qui tomberaient sinon sur la même ligne.
+// Exporté : réutilisé par busRouting.js pour le tronc/les dérivations d'un bus.
+export function laneOffset(id) {
   let hash = 0
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) % 1000
   return ((hash % 5) - 2) * 6
+}
+
+// Tracé orthogonal en « Z » (2 coudes) entre deux points déjà positionnés.
+// Exporté : c'est le même primitive utilisée pour router un câble individuel
+// ET pour router le tronc/les dérivations d'un bus (busRouting.js) — le mode
+// bus ne remplace pas le routage orthogonal, il l'applique à d'autres paires
+// de points (hub↔centroïde, centroïde↔équipement au lieu de source↔cible).
+export function orthogonalPath(a, b, lane = 0) {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const midX = (a.x + b.x) / 2 + lane
+    return [a, { x: midX, y: a.y }, { x: midX, y: b.y }, b]
+  }
+  const midY = (a.y + b.y) / 2 + lane
+  return [a, { x: a.x, y: midY }, { x: b.x, y: midY }, b]
 }
 
 // Tracé orthogonal en « Z » (2 coudes) entre deux points d'attache déjà décalés.
@@ -19,14 +36,7 @@ function autoRoutePoints(link, source, target, sourceOffset, targetOffset) {
 
   const a = { x: source.x + perp.x * sourceOffset, y: source.y + perp.y * sourceOffset }
   const b = { x: target.x + perp.x * targetOffset, y: target.y + perp.y * targetOffset }
-  const lane = laneOffset(link.id)
-
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    const midX = (a.x + b.x) / 2 + lane
-    return [a, { x: midX, y: a.y }, { x: midX, y: b.y }, b]
-  }
-  const midY = (a.y + b.y) / 2 + lane
-  return [a, { x: a.x, y: midY }, { x: b.x, y: midY }, b]
+  return orthogonalPath(a, b, laneOffset(link.id))
 }
 
 // Calcule, pour tous les câbles, la liste de points à tracer : tracé libre à
